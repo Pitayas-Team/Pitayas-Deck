@@ -1,9 +1,10 @@
 // ═══════ PITAYA DECK — SERWER DLA TELEFONÓW I TABLETÓW ═══════
-// HTTP: strona decka (client/), wspólny kod rysowania (shared/), obrazy przycisków (/img/…).
-// WebSocket: logowanie urządzenia, zatwierdzanie na komputerze, stan folderu, naciśnięcia.
+// HTTP: strona decka (client/), wspólny kod rysowania (shared/), obrazy (/img/…), okładki (/art?f=…).
+// WebSocket: logowanie urządzenia, zatwierdzanie na komputerze, stan folderu, naciśnięcia, suwaki.
 //
 // Protokół (JSON):
-//   telefon → serwer: { t: 'hello', deviceId, name } | { t: 'press', key, phase: 'press'|'long'|'release' } | { t: 'nav', to: 'back'|'home' }
+//   telefon → serwer: { t: 'hello', deviceId, name } | { t: 'press', key, phase: 'press'|'long'|'release' }
+//                     { t: 'slider', key, value } | { t: 'media', key, cmd: 'previous'|'play-pause'|'next' } | { t: 'nav', to: 'back'|'home' }
 //   serwer → telefon: { t: 'pending' } | { t: 'denied' } | { t: 'state', … } | { t: 'toast', text, kind }
 const http = require('http');
 const fs = require('fs');
@@ -27,6 +28,39 @@ function localAddresses() {
     return out.sort((a, b) => (/^(tailscale|tun|wg)/.test(a.name) ? 1 : 0) - (/^(tailscale|tun|wg)/.test(b.name) ? 1 : 0));
 }
 
+// Ikony Lucide (ISC) — wczytujemy raz, przy pierwszym użyciu
+let lucide = null;
+const GLYPH_TO_LUCIDE = { 'volume-up': 'volume-2', 'volume-down': 'volume-1', 'volume-off': 'volume-x', prev: 'skip-back', next: 'skip-forward', 'play-pause': 'circle-play', play: 'play', pause: 'pause', stop: 'square', mic: 'mic', 'mic-off': 'mic-off', record: 'circle-dot', folder: 'folder', chip: 'cpu', star: 'star', home: 'house', back: 'arrow-left', gear: 'settings', lock: 'lock', power: 'power', camera: 'camera', light: 'lightbulb', terminal: 'terminal', globe: 'globe', keyboard: 'keyboard', music: 'music', bolt: 'zap' };
+
+function lucideSvg(appDir, name) {
+    if (!lucide) {
+        try { lucide = JSON.parse(fs.readFileSync(path.join(appDir, 'shared', 'lucide.json'), 'utf8')).icons; } catch { lucide = {}; }
+    }
+    return lucide[name] || '';
+}
+
+function truthy(v) {
+    return v === true || v === 1 || v === 'true' || v === 'on' || v === 'Playing' || (typeof v === 'number' && v > 0);
+}
+// Reguła stanu: zmienna, operator, wartość
+function ruleMatches(rule, get) {
+    const left = get(rule.var);
+    const right = rule.value;
+    const num = (x) => (typeof x === 'number' ? x : parseFloat(String(x).replace(',', '.')));
+    switch (rule.op || '==') {
+        case 'on': return truthy(left);
+        case 'off': return !truthy(left);
+        case '==': return String(left) === String(right) || (typeof left === 'boolean' && String(left) === String(right).toLowerCase());
+        case '!=': return String(left) !== String(right);
+        case '>': return num(left) > num(right);
+        case '<': return num(left) < num(right);
+        case '>=': return num(left) >= num(right);
+        case '<=': return num(left) <= num(right);
+        case 'contains': return String(left ?? '').toLowerCase().includes(String(right ?? '').toLowerCase());
+        default: return false;
+    }
+}
+
 function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
     const sessions = new Map();   // ws → { deviceId, folderId, approved }
     let server = null;
@@ -48,6 +82,13 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
             const full = path.resolve(base, '.' + rel);
             return full.startsWith(path.resolve(base) + path.sep) ? full : null;
         };
+        // Okładka z lokalnego pliku odtwarzacza (file://…) — tylko obrazy i tylko gdy to aktualna okładka
+        if (p === '/art') {
+            const f = url.searchParams.get('f') || '';
+            const current = String(runtime.getVariable('media.artUrl') || '');
+            if (!current.startsWith('file://') || decodeURIComponent(current.slice(7)) !== f || !/\.(png|jpe?g|webp|gif)$/i.test(f)) { res.writeHead(404); res.end(); return; }
+            return serveFile(res, f);
+        }
         let file = null;
         if (p === '/' || p === '/index.html') file = path.join(appDir, 'client', 'index.html');
         else if (p.startsWith('/img/')) file = safe(store.imagesDir, p.slice(4));
@@ -58,53 +99,131 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
         serveFile(res, file);
     }
 
-    // ───── Stan przycisków ─────
-    function isOn(button) {
-        if (!button.stateVar) return false;
-        const v = runtime.getVariable(button.stateVar);
-        return v === true || v === 1 || v === 'true' || v === 'on' || (typeof v === 'number' && v > 0);
+    // ───── Stany przycisków ─────
+    // Zwraca { index, state } aktywnego stanu (albo null dla zwykłego przycisku)
+    function activeState(w, folderId, key) {
+        if (Array.isArray(w.states) && w.states.length) {
+            if (w.stateSource === 'variable') {
+                for (const rule of w.stateRules || []) {
+                    if (ruleMatches(rule, runtime.getVariable)) {
+                        const i = w.states.findIndex((s) => s.id === rule.state);
+                        if (i >= 0) return { index: i, state: w.states[i] };
+                    }
+                }
+                return { index: 0, state: w.states[0] };
+            }
+            const id = store.widgetState(folderId, key);
+            const i = Math.max(0, w.states.findIndex((s) => s.id === id));
+            return { index: i, state: w.states[i] };
+        }
+        if (w.stateVar) {
+            const on = truthy(runtime.getVariable(w.stateVar));
+            return { index: on ? 1 : 0, state: on ? { id: 'on', look: w.on || {} } : { id: 'off', look: {} } };
+        }
+        return null;
     }
-    // Przycisk gotowy do narysowania: zmienne podstawione, wygląd „włączony” nałożony
-    function renderButton(button) {
-        if (!button) return null;
-        const on = isOn(button);
-        const look = on && button.on ? { ...button, ...Object.fromEntries(Object.entries(button.on).filter(([, v]) => v !== '' && v !== null && v !== undefined)) } : button;
-        let icon = look.icon || { type: 'none' };
-        if (icon.type === 'image' && icon.value) icon = { type: 'image', value: `/img/${encodeURIComponent(icon.value)}`, fill: Boolean(icon.fill) };
-        return {
+    function mergeLook(base, look) {
+        const out = { ...base };
+        for (const [k, v] of Object.entries(look || {})) if (v !== '' && v !== null && v !== undefined) out[k] = v;
+        return out;
+    }
+    function renderIcon(icon) {
+        if (!icon || !icon.type || icon.type === 'none') return { type: 'none' };
+        const base = { fit: icon.fit || 'contain', zoom: icon.zoom || 100, opacity: icon.opacity === undefined ? 100 : icon.opacity, color: icon.color || '' };
+        if (icon.type === 'image') return icon.value ? { ...base, type: 'image', value: `/img/${encodeURIComponent(icon.value)}`, fill: Boolean(icon.fill) } : { type: 'none' };
+        // Stare ikony z wersji 0.1 → odpowiedniki Lucide
+        if (icon.type === 'glyph' && GLYPH_TO_LUCIDE[icon.value]) icon = { ...icon, type: 'lucide', value: GLYPH_TO_LUCIDE[icon.value] };
+        if (icon.type === 'lucide') return { ...base, type: 'lucide', value: icon.value, svg: lucideSvg(appDir, icon.value) };
+        return { ...base, type: icon.type, value: icon.value };
+    }
+    function artUrl(u) {
+        if (!u) return '';
+        if (u.startsWith('file://')) return `/art?f=${encodeURIComponent(decodeURIComponent(u.slice(7)))}`;
+        return /^https?:\/\//.test(u) ? u : '';
+    }
+
+    // Widżet gotowy do narysowania: zmienne podstawione, wygląd stanu nałożony
+    function renderButton(w, folderId, key) {
+        if (!w) return null;
+        const st = folderId !== undefined ? activeState(w, folderId, key) : null;
+        const look = st ? mergeLook(w, st.state.look) : w;
+        const out = {
+            type: w.type || 'button',
+            w: Math.max(1, w.w || 1),
+            h: Math.max(1, w.h || 1),
             label: runtime.render(look.label),
             labelPos: look.labelPos || 'bottom',
-            icon,
+            textAlign: look.textAlign || 'center',
+            icon: renderIcon(look.icon),
             bg: look.bg || '#23222a',
-            color: look.color || '#ffffff',
+            color: look.color || '',
             fontSize: look.fontSize || 14,
-            on,
-            hasLong: Boolean(button.actions && button.actions.longPress && button.actions.longPress.length),
+            shadow: look.labelShadow !== false,
+            outline: Boolean(look.labelOutline),
+            border: look.border && look.border.width ? { width: look.border.width, color: look.border.color || '#ff4fa6' } : null,
+            on: Boolean(st && st.index > 0),
+            stateName: st && st.state && st.state.name ? st.state.name : '',
+            hasLong: Boolean(w.actions && w.actions.longPress && w.actions.longPress.length),
         };
+        const num = (name) => { const v = parseFloat(runtime.getVariable(name)); return isNaN(v) ? 0 : v; };
+        if (out.type === 'slider') {
+            const s = w.slider || {};
+            const varName = { volume: 'media.volume', mic: 'media.micVolume', player: 'media.playerVolume' }[s.preset] || s.var;
+            out.slider = {
+                value: varName ? num(varName) : (s.value || 0), min: s.min ?? 0, max: s.max ?? 100, step: s.step || 1,
+                orientation: s.orientation || (out.h > out.w ? 'vertical' : 'horizontal'), showValue: s.showValue !== false, unit: s.unit ?? (s.preset ? '%' : ''),
+            };
+        }
+        if (out.type === 'clock') out.clock = { seconds: Boolean((w.clock || {}).seconds), date: (w.clock || {}).date !== false, h12: Boolean((w.clock || {}).h12) };
+        if (out.type === 'gauge') {
+            out.gauges = (w.gauges || []).map((g) => {
+                const v = num(g.var);
+                const max = parseFloat(g.max) || 100;
+                return { name: g.name || '', value: v, max, unit: g.unit ?? '%', pct: Math.max(0, Math.min(100, (v / max) * 100)) };
+            });
+            out.gaugeStyle = w.gaugeStyle || 'ring';
+        }
+        if (out.type === 'media') {
+            const g = (n) => runtime.getVariable(`media.${n}`);
+            out.media = {
+                title: g('title') || '', artist: g('artist') || '', album: (w.media || {}).album === false ? '' : (g('album') || ''),
+                art: artUrl(g('artUrl')), playing: truthy(g('playing')), position: num('media.position'), length: num('media.length'),
+                timeline: (w.media || {}).timeline !== false, player: g('player') || '',
+            };
+        }
+        return out;
     }
+
     function folderState(folderId, deviceId) {
         const folder = store.folder(folderId);
         const profile = store.profileOfFolder(folderId) || store.profile();
+        const grid = store.gridOf(folderId);
         const buttons = {};
-        for (const [key, b] of Object.entries((folder && folder.buttons) || {})) buttons[key] = renderButton(b);
+        for (const [key, b] of Object.entries((folder && folder.buttons) || {})) buttons[key] = renderButton(b, folderId, key);
         const device = deviceId ? store.device(deviceId) : null;
         return {
             t: 'state',
-            profile: { id: profile.id, name: profile.name, cols: profile.cols, rows: profile.rows },
+            profile: { id: profile.id, name: profile.name, cols: grid.cols, rows: grid.rows },
+            style: { spacing: profile.spacing ?? 10, radius: profile.radius ?? 22, background: profile.background || '' },
             folder: { id: folder ? folder.id : null, name: folder ? folder.name : '', canBack: Boolean(folder && folder.parent) },
             buttons,
             device: device ? { id: device.id, name: device.name } : null,
             settings: { showClock: store.deck.settings.showClock },
         };
     }
-    // Zmienne użyte przez przyciski widocznego folderu
+    // Zmienne użyte przez widżety widocznego folderu
     function folderVariables(folderId) {
         const used = new Set();
         const folder = store.folder(folderId);
         for (const b of Object.values((folder && folder.buttons) || {})) {
             for (const n of runtime.variablesUsed(b.label)) used.add(n);
             if (b.on) for (const n of runtime.variablesUsed(b.on.label)) used.add(n);
+            for (const s of b.states || []) for (const n of runtime.variablesUsed(s.look && s.look.label)) used.add(n);
+            for (const r of b.stateRules || []) used.add(r.var);
             if (b.stateVar) used.add(b.stateVar);
+            if (b.type === 'slider') ['media.volume', 'media.micVolume', 'media.playerVolume', b.slider && b.slider.var].forEach((n) => n && used.add(n));
+            if (b.type === 'gauge') for (const g of b.gauges || []) used.add(g.var);
+            if (b.type === 'media') ['title', 'artist', 'album', 'artUrl', 'playing', 'position', 'length', 'player'].forEach((n) => used.add(`media.${n}`));
         }
         return used;
     }
@@ -127,9 +246,9 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
         for (const [ws, s] of sessions) if (s.approved && s.vars && s.vars.has(name)) dirty.add(ws);
         if (dirty.size && !flushTimer) flushTimer = setTimeout(() => { flushTimer = null; for (const ws of dirty) pushState(ws); dirty.clear(); }, 80);
     });
-    store.onChange((what) => { if (['buttons', 'folders', 'profiles', 'all', 'settings'].includes(what)) pushAll(); });
+    store.onChange((what) => { if (['buttons', 'folders', 'profiles', 'all', 'settings', 'states'].includes(what)) pushAll(); });
 
-    // ───── Nawigacja dla wtyczek (ctx.deck) ─────
+    // ───── API dla wtyczek (ctx.deck) ─────
     const deckApi = {
         openFolder(deviceId, folderId) {
             if (!store.folder(folderId)) throw new Error('Folder nie istnieje');
@@ -151,7 +270,18 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
             for (const [ws, s] of sessionsOf(deviceId)) { s.folderId = p.root; pushState(ws); }
         },
         toast(deviceId, text, kind = 'info') {
-            for (const [ws] of deviceId ? sessionsOf(deviceId) : sessions) send(ws, { t: 'toast', text, kind });
+            for (const [ws] of deviceId && deviceId !== 'editor' ? sessionsOf(deviceId) : sessions) send(ws, { t: 'toast', text, kind });
+        },
+        // Stan przycisku wielostanowego: konkretny id albo 'next' / 'previous'
+        setState(folderId, key, stateId) {
+            const w = store.folder(folderId) && store.folder(folderId).buttons[key];
+            if (!w || !Array.isArray(w.states) || !w.states.length) throw new Error('Ten przycisk nie ma stanów');
+            const cur = Math.max(0, w.states.findIndex((s) => s.id === store.widgetState(folderId, key)));
+            let next = w.states.findIndex((s) => s.id === stateId || s.name === stateId);
+            if (stateId === 'next') next = (cur + 1) % w.states.length;
+            if (stateId === 'previous') next = (cur - 1 + w.states.length) % w.states.length;
+            if (next < 0) throw new Error(`Brak stanu „${stateId}”`);
+            store.setWidgetState(folderId, key, w.states[next].id);
         },
         profiles: () => store.deck.profiles.map((p) => ({ value: p.id, label: p.name })),
         folders: () => Object.values(store.deck.folders).map((f) => ({ value: f.id, label: `${(store.profileOfFolder(f.id) || {}).name || '?'} › ${store.folderPath(f.id).map((x) => x.name).join(' › ')}` })),
@@ -165,6 +295,32 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
             .sort((a, b) => (b.online - a.online) || (b.lastSeen || 0) - (a.lastSeen || 0));
     }
     function emitDevices() { onEvent('devices', devicesList()); }
+
+    // Akcje widżetu (wspólne dla telefonu i przycisku „Testuj” w edytorze)
+    async function trigger(deviceId, folderId, key, phase, locals = {}) {
+        const folder = store.folder(folderId);
+        const w = folder && folder.buttons[key];
+        if (!w) return [];
+        // Przycisk „przełączany naciśnięciem” zmienia stan przed wykonaniem akcji
+        if (phase === 'press' && Array.isArray(w.states) && w.states.length > 1 && w.stateSource === 'cycle') deckApi.setState(folderId, key, 'next');
+        const actions = (w.actions && w.actions[phase]) || [];
+        if (!actions.length) return [];
+        return runtime.runActions(actions, { device: deviceId, button: w, folderId, key, locals });
+    }
+    const sliderTimers = new Map();
+    async function slider(deviceId, folderId, key, value) {
+        const w = store.folder(folderId) && store.folder(folderId).buttons[key];
+        if (!w || w.type !== 'slider') return;
+        const s = w.slider || {};
+        const v = Math.max(s.min ?? 0, Math.min(s.max ?? 100, Number(value) || 0));
+        if (s.preset === 'volume') await runtime.runActions([{ plugin: 'media', action: 'volume', config: { mode: 'set', value: v } }], { device: deviceId });
+        else if (s.preset === 'mic') await runtime.runActions([{ plugin: 'media', action: 'mic-volume', config: { value: v } }], { device: deviceId });
+        else if (s.preset === 'player') await runtime.runActions([{ plugin: 'media', action: 'player-volume', config: { value: v, player: s.player || '' } }], { device: deviceId });
+        else {
+            if (s.var && !s.var.includes('.')) runtime.setUserVariable(s.var, v, 'number');
+            await trigger(deviceId, folderId, key, 'change', { value: v });
+        }
+    }
 
     function onMessage(ws, msg) {
         const s = sessions.get(ws);
@@ -189,14 +345,33 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
         }
         if (!s || !s.approved) return;
         if (msg.t === 'press') {
-            const folder = store.folder(s.folderId);
-            const button = folder && folder.buttons[msg.key];
-            if (!button) return;
             const phase = { press: 'press', long: 'longPress', release: 'release' }[msg.phase];
-            if (!phase) return;
-            const actions = (button.actions && button.actions[phase]) || [];
-            if (!actions.length) return;
-            runtime.runActions(actions, { device: s.deviceId, button, folderId: s.folderId });
+            if (phase) trigger(s.deviceId, s.folderId, String(msg.key), phase);
+            return;
+        }
+        if (msg.t === 'slider') {
+            // Suwak wysyła dużo zdarzeń — wykonujemy je po kolei, zawsze z ostatnią wartością
+            const k = `${s.deviceId}/${msg.key}`;
+            const job = sliderTimers.get(k) || { busy: false, latest: undefined };
+            job.latest = msg.value;
+            sliderTimers.set(k, job);
+            if (!job.busy) {
+                job.busy = true;
+                (async () => {
+                    while (job.latest !== undefined) {
+                        const v = job.latest;
+                        job.latest = undefined;
+                        try { await slider(s.deviceId, s.folderId, String(msg.key), v); } catch {}
+                        await new Promise((r) => setTimeout(r, 40));
+                    }
+                    job.busy = false;
+                })();
+            }
+            return;
+        }
+        if (msg.t === 'media') {
+            const cmd = { previous: 'previous', 'play-pause': 'play-pause', next: 'next' }[msg.cmd];
+            if (cmd) runtime.runActions([{ plugin: 'media', action: 'media', config: { command: cmd } }], { device: s.deviceId });
             return;
         }
         if (msg.t === 'nav') {
@@ -244,11 +419,11 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
     }
 
     return {
-        start, stop, approve, deckApi, folderState, renderButton, devicesList,
+        start, stop, approve, deckApi, folderState, renderButton, devicesList, trigger, slider,
         get port() { return port; },
         urls: () => localAddresses().map((a) => ({ ...a, url: `http://${a.address}:${port}` })),
         removeDevice(id) { for (const [ws] of sessionsOf(id)) ws.close(); store.removeDevice(id); emitDevices(); },
     };
 }
 
-module.exports = { createServer, localAddresses };
+module.exports = { createServer, localAddresses, ruleMatches };

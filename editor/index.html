@@ -18,7 +18,7 @@
     <div class="m-titlebar-actions">
       <button class="m-btn small accent" id="btnConnect">Połącz telefon</button>
       <div class="m-update-pill" id="updatePill" title="Dostępna aktualizacja">Aktualizacja</div>
-      <button class="m-win-btn" id="btnSettings" title="Ustawienia" onclick="openSettings('general')"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span class="m-dot"></span></button>
+      <button class="m-win-btn" id="btnSettings" title="Ustawienia" onclick="openSettings('general')"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg><span class="m-dot"></span></button>
       <div class="m-win-sep"></div>
       <button class="m-win-btn" data-win="min" title="Minimalizuj"><svg viewBox="0 0 12 12"><path d="M1 6.5h10"/></svg></button>
       <button class="m-win-btn" id="btnMax" title="Maksymalizuj"><svg viewBox="0 0 12 12"><rect x="1.5" y="1.5" width="9" height="9"/></svg></button>
@@ -43,6 +43,13 @@
           <span>×</span>
           <label>Wiersze <input type="number" class="m-input" id="rowsInput" min="1" max="10"></label>
         </div>
+        <details class="side-more">
+          <summary>Wygląd profilu</summary>
+          <label class="mini">Odstęp między przyciskami <span id="spacingVal"></span><input type="range" id="spacingInput" min="0" max="30"></label>
+          <label class="mini">Zaokrąglenie <span id="radiusVal"></span><input type="range" id="radiusInput" min="0" max="50"></label>
+          <div class="mini">Tło decka na telefonie</div>
+          <div class="colors" id="deckBgColors"></div>
+        </details>
       </section>
 
       <section class="side-sec grow">
@@ -54,6 +61,11 @@
           </div>
         </div>
         <div class="tree" id="tree"></div>
+        <div class="grid-size folder-grid">
+          <label>Siatka folderu <input type="number" class="m-input" id="fColsInput" min="1" max="12" placeholder="auto"></label>
+          <span>×</span>
+          <label>&nbsp;<input type="number" class="m-input" id="fRowsInput" min="1" max="10" placeholder="auto"></label>
+        </div>
       </section>
 
       <section class="side-sec">
@@ -68,7 +80,7 @@
       <div class="stage" id="stage">
         <div class="deck-grid" id="grid"></div>
       </div>
-      <div class="hint">Kliknij pole, żeby dodać lub edytować przycisk · przeciągnij, żeby przenieść · prawy przycisk myszy: kopiuj / wklej / usuń</div>
+      <div class="hint">Kliknij puste pole, żeby dodać widżet · przeciągnij, żeby przenieść · prawy przycisk myszy: kopiuj / wklej / usuń · upuść obraz na przycisk, żeby ustawić ikonę</div>
     </main>
 
     <!-- PRAWY PANEL: INSPEKTOR -->
@@ -76,7 +88,7 @@
       <div class="insp-empty" id="inspEmpty">
         <div class="insp-empty-icon">▦</div>
         <div class="m-panel-title">Wybierz pole</div>
-        <div class="m-small">Kliknij dowolne pole siatki, żeby utworzyć przycisk albo zmienić istniejący.</div>
+        <div class="m-small">Kliknij puste pole siatki, żeby dodać przycisk albo widżet, albo istniejący, żeby go zmienić.</div>
       </div>
 
       <div class="insp" id="insp" hidden>
@@ -86,25 +98,36 @@
             <div class="m-panel-title" id="inspTitle">Przycisk</div>
             <div class="m-small" id="inspPos"></div>
           </div>
-          <button class="m-btn small" id="btnTest" title="Uruchom akcje naciśnięcia">▶ Testuj</button>
+          <button class="m-btn small" id="btnTest" title="Uruchom jak naciśnięcie na telefonie">▶ Testuj</button>
         </div>
 
-        <div class="m-tabs insp-tabs">
+        <div class="m-tabs insp-tabs" id="inspTabs">
           <button class="m-tab active" data-tab="look">Wygląd</button>
+          <button class="m-tab" data-tab="widget" id="tabWidget">Widżet</button>
           <button class="m-tab" data-tab="actions">Akcje <span class="tab-count" id="actionsCount"></span></button>
-          <button class="m-tab" data-tab="state">Stan</button>
+          <button class="m-tab" data-tab="state" id="tabState">Stan</button>
         </div>
 
         <!-- WYGLĄD -->
         <div class="insp-body" data-pane="look">
-          <div class="m-field">
+          <div class="row2">
+            <div class="m-field">
+              <span class="m-label">Rozmiar (pola)</span>
+              <div class="size-row"><input type="number" class="m-input" id="fW" min="1" max="12"><span>×</span><input type="number" class="m-input" id="fH" min="1" max="10"></div>
+            </div>
+            <div class="m-field">
+              <span class="m-label">Typ</span>
+              <div class="type-chip" id="typeChip">Przycisk</div>
+            </div>
+          </div>
+          <div class="m-field" id="labelField">
             <label class="m-label" for="fLabel">Napis</label>
             <div class="with-btn">
-              <input class="m-input" id="fLabel" placeholder="np. Scena 1 albo {system.time}">
+              <textarea class="m-input one" id="fLabel" rows="1" placeholder="np. Scena 1 albo {system.time}"></textarea>
               <button class="m-btn small icon-only" id="btnInsertVar" title="Wstaw zmienną">{ }</button>
             </div>
           </div>
-          <div class="row2">
+          <div class="row2" id="labelStyle">
             <div class="m-field">
               <label class="m-label" for="fLabelPos">Położenie napisu</label>
               <select class="m-select" id="fLabelPos">
@@ -113,17 +136,29 @@
               </select>
             </div>
             <div class="m-field">
-              <label class="m-label" for="fFont">Rozmiar napisu <span id="fFontVal"></span></label>
-              <input type="range" id="fFont" min="9" max="34">
+              <span class="m-label">Wyrównanie</span>
+              <div class="seg small" id="fAlign"><button data-v="left">⟸</button><button data-v="center">≡</button><button data-v="right">⟹</button></div>
+            </div>
+          </div>
+          <div class="m-field">
+            <label class="m-label" for="fFont">Rozmiar napisu <span id="fFontVal"></span></label>
+            <input type="range" id="fFont" min="7" max="40">
+            <div class="row-btns">
+              <label class="check"><input type="checkbox" id="fShadow"> Cień napisu</label>
+              <label class="check"><input type="checkbox" id="fOutline"> Obrys napisu</label>
             </div>
           </div>
 
-          <div class="m-field">
+          <div class="m-field" id="iconField">
             <span class="m-label">Ikona</span>
             <div class="seg" id="iconType">
-              <button data-v="none">Brak</button><button data-v="glyph">Ikona</button><button data-v="emoji">Emoji</button><button data-v="image">Obraz</button>
+              <button data-v="none">Brak</button><button data-v="lucide">Ikona</button><button data-v="emoji">Emoji</button><button data-v="image">Obraz</button>
             </div>
-            <div class="icon-pane" data-icon="glyph"><div class="glyphs" id="glyphs"></div></div>
+            <div class="icon-pane" data-icon="lucide">
+              <input class="m-input" id="iconSearch" placeholder="Szukaj ikony: mikrofon, głośność, play, folder, steam…">
+              <div class="lucide-grid" id="lucideGrid"></div>
+              <div class="row-btns"><span class="m-small" id="iconCount"></span><span style="flex:1"></span><span class="m-small">Kolor ikony</span><div class="colors" id="iconColors"></div></div>
+            </div>
             <div class="icon-pane" data-icon="emoji">
               <input class="m-input" id="fEmoji" maxlength="8" placeholder="Wklej emoji, np. 🎮">
               <div class="emojis" id="emojis"></div>
@@ -131,9 +166,11 @@
             <div class="icon-pane" data-icon="image">
               <div class="row-btns">
                 <button class="m-btn small" id="btnImage">Wybierz obraz…</button>
-                <label class="check"><input type="checkbox" id="fImageFill"> Wypełnij cały przycisk</label>
+                <div class="seg small" id="fFit"><button data-v="contain">Dopasuj</button><button data-v="cover">Wypełnij</button></div>
               </div>
-              <div class="m-small">Albo przeciągnij obraz na przycisk w siatce.</div>
+              <label class="mini">Powiększenie <span id="fZoomVal"></span><input type="range" id="fZoom" min="40" max="200"></label>
+              <label class="mini">Przezroczystość ikony <span id="fOpacityVal"></span><input type="range" id="fOpacity" min="10" max="100"></label>
+              <div class="m-small">Możesz też przeciągnąć obraz z dysku na pole w siatce.</div>
             </div>
           </div>
 
@@ -147,50 +184,43 @@
               <div class="colors" id="fgColors"></div>
             </div>
           </div>
+          <div class="m-field">
+            <label class="check"><input type="checkbox" id="fBorder"> Ramka</label>
+            <div class="colors" id="borderColors"></div>
+          </div>
         </div>
+
+        <!-- WIDŻET (ustawienia zależne od typu) -->
+        <div class="insp-body" data-pane="widget" hidden><div id="widgetPane"></div></div>
 
         <!-- AKCJE -->
         <div class="insp-body" data-pane="actions" hidden>
-          <div class="seg small" id="phase">
-            <button data-v="press" class="active">Naciśnięcie</button><button data-v="longPress">Przytrzymanie</button><button data-v="release">Puszczenie</button>
-          </div>
+          <div class="seg small" id="phase"></div>
           <div class="m-small phase-hint" id="phaseHint"></div>
           <div class="actions-list" id="actionsList"></div>
           <button class="m-btn block" id="btnAddAction">＋ Dodaj akcję</button>
         </div>
 
         <!-- STAN -->
-        <div class="insp-body" data-pane="state" hidden>
-          <div class="m-small">Przycisk może zmieniać wygląd, gdy zmienna jest włączona — np. czerwony, gdy trwa nagrywanie albo mikrofon jest wyciszony.</div>
-          <div class="m-field">
-            <label class="m-label" for="fStateVar">Zmienna stanu</label>
-            <select class="m-select" id="fStateVar"></select>
-          </div>
-          <div class="state-on" id="stateOn">
-            <div class="m-label">Wygląd, gdy włączone</div>
-            <div class="m-field">
-              <label class="m-label" for="fOnLabel">Napis (puste = bez zmian)</label>
-              <input class="m-input" id="fOnLabel" placeholder="np. NAGRYWAM">
-            </div>
-            <div class="m-field">
-              <span class="m-label">Tło</span>
-              <div class="colors" id="onBgColors"></div>
-            </div>
-            <div class="m-field">
-              <label class="m-label" for="fOnGlyph">Ikona (puste = bez zmian)</label>
-              <select class="m-select" id="fOnGlyph"></select>
-            </div>
-            <button class="m-btn small" id="btnMakeToggle">Zrób z tego przełącznik</button>
-            <div class="m-small">Dodaje akcję „Przełącz zmienną” — każde naciśnięcie włącza albo wyłącza stan.</div>
-          </div>
-        </div>
+        <div class="insp-body" data-pane="state" hidden><div id="statePane"></div></div>
 
         <div class="insp-foot">
           <button class="m-btn small" id="btnDuplicate">Duplikuj</button>
-          <button class="m-btn small danger" id="btnDelete">Usuń przycisk</button>
+          <button class="m-btn small danger" id="btnDelete">Usuń</button>
         </div>
       </div>
     </aside>
+  </div>
+
+  <!-- MENU: DODAJ WIDŻET -->
+  <div class="ctx add-menu" id="addMenu" hidden>
+    <div class="ctx-title">Dodaj w tym polu</div>
+    <button data-add="button"><span>▣</span>Przycisk<small>akcje po naciśnięciu</small></button>
+    <button data-add="folder"><span>📁</span>Folder<small>przycisk otwierający nowy folder</small></button>
+    <button data-add="slider"><span>▥</span>Suwak<small>głośność, mikrofon, Spotify, zmienna</small></button>
+    <button data-add="media"><span>♪</span>Odtwarzacz<small>okładka, tytuł, przyciski (2×2)</small></button>
+    <button data-add="gauge"><span>◔</span>Wskaźniki<small>CPU, GPU, RAM, temperatura (2×2)</small></button>
+    <button data-add="clock"><span>🕒</span>Zegar<small>godzina i data (2×1)</small></button>
   </div>
 
   <!-- MENU KONTEKSTOWE -->
@@ -198,7 +228,6 @@
     <button data-cmd="copy">Kopiuj</button>
     <button data-cmd="paste">Wklej</button>
     <button data-cmd="duplicate">Duplikuj w następne wolne pole</button>
-    <button data-cmd="folder">Utwórz folder z przyciskiem</button>
     <button data-cmd="delete" class="danger">Usuń</button>
   </div>
 
@@ -248,20 +277,20 @@
         <button class="m-modal-close" onclick="PitayaUI.closeModal('modalAction')">✕</button>
       </div>
       <div class="m-modal-body">
-        <input class="m-input" id="actionSearch" placeholder="Szukaj: scena, głośność, skrót…">
+        <input class="m-input" id="actionSearch" placeholder="Szukaj: scena, głośność, skrót, playlista…">
         <div class="action-picker" id="actionPicker"></div>
       </div>
     </div>
   </div>
 
-  <!-- MODAL: ZMIENNE (wstawianie do napisu) -->
+  <!-- MODAL: ZMIENNE (wstawianie / wybór) -->
   <div class="m-modal-overlay" id="modalVars">
     <div class="m-modal">
       <div class="m-modal-header">
-        <span class="m-modal-title">Wstaw zmienną</span>
+        <span class="m-modal-title" id="varsTitle">Wstaw zmienną</span>
         <button class="m-modal-close" onclick="PitayaUI.closeModal('modalVars')">✕</button>
       </div>
-      <div class="m-modal-body"><div class="var-list" id="varPicker"></div></div>
+      <div class="m-modal-body"><input class="m-input" id="varSearch" placeholder="Szukaj zmiennej…"><div class="var-list" id="varPicker"></div></div>
     </div>
   </div>
 
@@ -280,6 +309,12 @@
       </div>
       <div class="m-modal-body">
         <div data-spane="general">
+          <div class="import-card" id="importCard" hidden>
+            <div class="import-icon">⇪</div>
+            <div class="import-text"><b>Przenieś deck z Macro Deck</b><div class="m-small">Foldery, przyciski ze stanami, suwaki, zegar, wskaźniki, odtwarzacz i ikony trafią do nowego profilu. Macro Deck zostaje bez zmian.</div></div>
+            <button class="m-btn small accent" id="btnImportMd">Importuj</button>
+          </div>
+          <div class="m-small" id="importResult"></div>
           <div class="row2">
             <div class="m-field">
               <label class="m-label" for="fPort">Port serwera</label>
@@ -291,7 +326,7 @@
             </div>
           </div>
           <label class="check"><input type="checkbox" id="fApproval2"> Pytaj o zgodę przy nowym urządzeniu</label>
-          <label class="check"><input type="checkbox" id="fClock"> Pokazuj zegar na telefonie</label>
+          <label class="check"><input type="checkbox" id="fClock"> Pokazuj zegar na pasku telefonu</label>
           <div class="m-field">
             <span class="m-label">Kopia zapasowa</span>
             <div class="row-btns">
@@ -343,6 +378,7 @@
             <span class="m-label">Folder danych (Pitaya Core)</span>
             <div class="data-row"><code id="dataDirText">—</code><button class="m-btn small" id="btnOpenDataDir">Otwórz</button></div>
           </div>
+          <div class="m-small">Ikony: <a class="m-link" href="#" onclick="return false">Lucide</a> (licencja ISC, © Lucide Icons and Contributors).</div>
           <div class="m-small">Repozytorium: <a class="m-link" id="repoLink" href="#">github.com/MangoLabz/Pitayas-Deck</a></div>
           <button class="m-btn small danger" id="btnQuit">Zakończ Pitaya Deck</button>
         </div>

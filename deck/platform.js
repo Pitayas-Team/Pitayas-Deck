@@ -163,38 +163,113 @@ function createPlatform({ clipboard, shell, log = () => {} }) {
         const out = await exec('gdbus', ['call', '--session', '--dest', 'org.freedesktop.DBus', '--object-path', '/org/freedesktop/DBus', '--method', 'org.freedesktop.DBus.ListNames']);
         return [...out.matchAll(/'(org\.mpris\.MediaPlayer2\.[^']+)'/g)].map((m) => m[1]);
     }
+    const PLAYER_IFACE = 'org.mpris.MediaPlayer2.Player';
     function mprisGet(dest, prop) {
-        return exec('gdbus', ['call', '--session', '--dest', dest, '--object-path', '/org/mpris/MediaPlayer2', '--method', 'org.freedesktop.DBus.Properties.Get', 'org.mpris.MediaPlayer2.Player', prop], { timeout: 3000 });
+        return exec('gdbus', ['call', '--session', '--dest', dest, '--object-path', '/org/mpris/MediaPlayer2', '--method', 'org.freedesktop.DBus.Properties.Get', PLAYER_IFACE, prop], { timeout: 3000 });
     }
-    // Aktywny odtwarzacz: ten, który gra, inaczej pierwszy z listy
-    async function activePlayer() {
+    function mprisSet(dest, prop, gvariant) {
+        return exec('gdbus', ['call', '--session', '--dest', dest, '--object-path', '/org/mpris/MediaPlayer2', '--method', 'org.freedesktop.DBus.Properties.Set', PLAYER_IFACE, prop, gvariant], { timeout: 3000 });
+    }
+    function mprisCall(dest, method, ...args) {
+        return exec('gdbus', ['call', '--session', '--dest', dest, '--object-path', '/org/mpris/MediaPlayer2', '--method', `${PLAYER_IFACE}.${method}`, ...args], { timeout: 4000 });
+    }
+    // Wybrany odtwarzacz ('spotify', 'firefox'…) albo aktywny: ten, który gra, inaczej pierwszy z listy
+    async function findPlayer(prefer) {
         const players = await mprisPlayers();
+        if (prefer) {
+            const p = players.find((x) => x === prefer || x.replace('org.mpris.MediaPlayer2.', '').split('.')[0] === prefer);
+            if (p) return p;
+        }
         for (const p of players) {
             try { if (/Playing/.test(await mprisGet(p, 'PlaybackStatus'))) return p; } catch {}
         }
         return players[0] || null;
     }
-    async function media(command) {
+    async function listPlayers() {
+        const out = [];
+        for (const p of await mprisPlayers()) {
+            let name = p.replace('org.mpris.MediaPlayer2.', '');
+            try {
+                const id = await exec('gdbus', ['call', '--session', '--dest', p, '--object-path', '/org/mpris/MediaPlayer2', '--method', 'org.freedesktop.DBus.Properties.Get', 'org.mpris.MediaPlayer2', 'Identity'], { timeout: 2000 });
+                name = (id.match(/'([^']+)'/) || [])[1] || name;
+            } catch {}
+            out.push({ value: p.replace('org.mpris.MediaPlayer2.', '').split('.')[0], label: name });
+        }
+        return out;
+    }
+    async function needPlayer(prefer) {
+        const p = await findPlayer(prefer).catch(() => null);
+        if (!p) throw new Error(prefer ? `Odtwarzacz „${prefer}” nie jest uruchomiony` : 'Nie znaleziono żadnego odtwarzacza (Spotify, przeglądarka, VLC…)');
+        return p;
+    }
+    async function media(command, prefer) {
         const methods = { 'play-pause': 'PlayPause', play: 'Play', pause: 'Pause', next: 'Next', previous: 'Previous', stop: 'Stop' };
         if (!methods[command]) throw new Error(`Nieznane polecenie: ${command}`);
-        const player = await activePlayer().catch(() => null);
-        if (player) {
-            return exec('gdbus', ['call', '--session', '--dest', player, '--object-path', '/org/mpris/MediaPlayer2', '--method', `org.mpris.MediaPlayer2.Player.${methods[command]}`]);
-        }
+        const player = await findPlayer(prefer).catch(() => null);
+        if (player) return mprisCall(player, methods[command]);
+        if (prefer) throw new Error(`Odtwarzacz „${prefer}” nie jest uruchomiony`);
         // Bez MPRIS (Windows albo brak odtwarzacza) — klawisz multimedialny
         return pressCombo([{ 'play-pause': 'playpause', play: 'playpause', pause: 'playpause', next: 'next', previous: 'previous', stop: 'stop' }[command]]);
     }
-    async function nowPlaying() {
-        const player = await activePlayer().catch(() => null);
-        if (!player) return { title: '', artist: '', status: 'Stopped', player: '' };
-        let meta = '', status = '';
+    async function setShuffle(mode, prefer) {
+        const p = await needPlayer(prefer);
+        let on = mode === 'on';
+        if (mode === 'toggle') on = !/true/.test(await mprisGet(p, 'Shuffle'));
+        return mprisSet(p, 'Shuffle', `<${on}>`);
+    }
+    async function setLoop(mode, prefer) {
+        const p = await needPlayer(prefer);
+        const order = ['None', 'Playlist', 'Track'];
+        let value = { off: 'None', none: 'None', playlist: 'Playlist', track: 'Track' }[mode];
+        if (mode === 'cycle') {
+            const cur = ((await mprisGet(p, 'LoopStatus')).match(/'(\w+)'/) || [])[1] || 'None';
+            value = order[(order.indexOf(cur) + 1) % order.length];
+        }
+        if (!value) throw new Error(`Nieznany tryb powtarzania: ${mode}`);
+        return mprisSet(p, 'LoopStatus', `<'${value}'>`);
+    }
+    // Link Spotify (https://open.spotify.com/playlist/…) albo spotify:playlist:… — odtwarzacz zaczyna grać
+    async function openUri(uri, prefer) {
+        let u = String(uri || '').trim();
+        const m = u.match(/open\.spotify\.com\/(?:intl-\w+\/)?(playlist|album|track|artist|episode|show)\/([A-Za-z0-9]+)/);
+        if (m) u = `spotify:${m[1]}:${m[2]}`;
+        if (!u) throw new Error('Podaj link albo identyfikator');
+        const p = await needPlayer(prefer || (u.startsWith('spotify:') ? 'spotify' : ''));
+        return mprisCall(p, 'OpenUri', u);
+    }
+    async function seek(seconds, prefer) {
+        const p = await needPlayer(prefer);
+        return mprisCall(p, 'Seek', String(Math.round(seconds * 1e6)));
+    }
+    async function setPlayerVolume(value, prefer) {
+        const p = await needPlayer(prefer);
+        return mprisSet(p, 'Volume', `<${Math.max(0, Math.min(1, value / 100)).toFixed(2)}>`);
+    }
+    async function nowPlaying(prefer) {
+        const player = await findPlayer(prefer).catch(() => null);
+        const empty = { title: '', artist: '', album: '', artUrl: '', status: 'Stopped', player: '', length: 0, position: 0, shuffle: false, loop: 'None' };
+        if (!player) return empty;
+        let meta = '', status = '', pos = '', shuffle = '', loop = '', vol = '';
+        try { vol = await mprisGet(player, 'Volume'); } catch {}
         try { meta = await mprisGet(player, 'Metadata'); } catch {}
         try { status = (await mprisGet(player, 'PlaybackStatus')).match(/'(\w+)'/)?.[1] || ''; } catch {}
+        try { pos = await mprisGet(player, 'Position'); } catch {}
+        try { shuffle = await mprisGet(player, 'Shuffle'); } catch {}
+        try { loop = (await mprisGet(player, 'LoopStatus')).match(/'(\w+)'/)?.[1] || ''; } catch {}
         const str = (key) => {
             const m = meta.match(new RegExp(`'${key}':\\s*<\\[?'((?:[^'\\\\]|\\\\.)*)'`));
             return m ? m[1].replace(/\\'/g, "'") : '';
         };
-        return { title: str('xesam:title'), artist: str('xesam:artist'), album: str('xesam:album'), status, player: player.replace('org.mpris.MediaPlayer2.', '') };
+        const num = (re, text) => { const m = (text || '').match(re); return m ? parseInt(m[1], 10) : 0; };
+        return {
+            ...empty,
+            title: str('xesam:title'), artist: str('xesam:artist'), album: str('xesam:album'), artUrl: str('mpris:artUrl'),
+            status, player: player.replace('org.mpris.MediaPlayer2.', '').split('.')[0],
+            length: Math.round(num(/'mpris:length':\s*<(?:uint64|int64)?\s*(\d+)>/, meta) / 1e6),
+            position: Math.round(num(/(\d+)/, pos.replace(/^\(<(?:int64)?\s*/, '')) / 1e6),
+            shuffle: /true/.test(shuffle), loop: loop || 'None',
+            volume: (() => { const m = vol.match(/<(?:double\s*)?([\d.]+)>/); return m ? Math.round(parseFloat(m[1]) * 100) : null; })(),
+        };
     }
 
     // ───── Głośność i mikrofon ─────
@@ -234,6 +309,12 @@ function createPlatform({ clipboard, shell, log = () => {} }) {
             return winKeybd(Array(times).fill(mode === 'down' ? 0xAE : 0xAF));
         }
         throw new Error('Nie znaleziono sterowania dźwiękiem (wpctl ani pactl).');
+    }
+    async function setMicVolume(value) {
+        const v = Math.max(0, Math.min(100, Math.round(value)));
+        if (audio === 'wpctl') return exec('wpctl', ['set-volume', '@DEFAULT_AUDIO_SOURCE@', `${v}%`]);
+        if (audio === 'pactl') return exec('pactl', ['set-source-volume', '@DEFAULT_SOURCE@', `${v}%`]);
+        throw new Error('Nie znaleziono sterowania mikrofonem.');
     }
     async function setMic(mode) {
         if (audio === 'wpctl') return exec('wpctl', ['set-mute', '@DEFAULT_AUDIO_SOURCE@', mode === 'toggle' ? 'toggle' : mode === 'mute' ? '1' : '0']);
@@ -290,7 +371,7 @@ function createPlatform({ clipboard, shell, log = () => {} }) {
         if (uinput) { try { uinput.proc.stdin.end(); uinput.proc.kill(); } catch {} uinput = null; }
     }
 
-    return { pressCombo, parseCombo, typeText, media, nowPlaying, getVolume, setVolume, setMic, playSound, stopSounds, open, runCommand, keyboardBackend, dispose, which };
+    return { pressCombo, parseCombo, typeText, media, nowPlaying, listPlayers, setShuffle, setLoop, openUri, seek, setPlayerVolume, getVolume, setVolume, setMic, setMicVolume, playSound, stopSounds, open, runCommand, keyboardBackend, dispose, which, exec };
 }
 
 module.exports = { createPlatform, which };

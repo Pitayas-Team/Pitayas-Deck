@@ -66,6 +66,7 @@ function onEvent(type, d) {
     else if (type === 'StreamStateChanged') setState({ streaming: Boolean(d.outputActive) });
     else if (type === 'RecordStateChanged') setState({ recording: Boolean(d.outputActive), recordPaused: d.outputState === 'OBS_WEBSOCKET_OUTPUT_PAUSED' });
     else if (type === 'ReplayBufferStateChanged') setState({ replayBuffer: Boolean(d.outputActive) });
+    else if (type === 'VirtualcamStateChanged') setState({ virtualcam: Boolean(d.outputActive) });
     else if (type === 'InputMuteStateChanged') ctxRef.setVariable(`muted.${d.inputName}`, Boolean(d.inputMuted));
     else if (type === 'ExitStarted') setState({ connected: false });
 }
@@ -85,12 +86,14 @@ async function refresh() {
     const stream = await call('GetStreamStatus').catch(() => ({}));
     const record = await call('GetRecordStatus').catch(() => ({}));
     const replay = await call('GetReplayBufferStatus').catch(() => ({}));
+    const vcam = await call('GetVirtualCamStatus').catch(() => ({}));
     setState({
         scene: scene.currentProgramSceneName || scene.sceneName || '',
         streaming: Boolean(stream.outputActive),
         recording: Boolean(record.outputActive),
         recordPaused: Boolean(record.outputPaused),
         replayBuffer: Boolean(replay.outputActive),
+        virtualcam: Boolean(vcam.outputActive),
     });
     const inputs = await call('GetInputList').catch(() => ({ inputs: [] }));
     for (const i of inputs.inputs || []) {
@@ -117,6 +120,7 @@ module.exports = {
         { id: 'recording', label: 'Nagrywanie trwa' },
         { id: 'recordPaused', label: 'Nagrywanie wstrzymane' },
         { id: 'replayBuffer', label: 'Bufor powtórek włączony' },
+        { id: 'virtualcam', label: 'Wirtualna kamera włączona' },
     ],
     start: async (ctx) => { ctxRef = ctx; stopped = false; setState({ connected: false }); connect(); },
     settingsChanged: async (ctx) => { ctxRef = ctx; connect(); },

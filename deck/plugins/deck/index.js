@@ -63,6 +63,19 @@ module.exports = {
             },
         },
         {
+            id: 'set-state',
+            name: 'Ustaw stan przycisku',
+            description: 'Dla przycisków z kilkoma stanami (zakładka Stan)',
+            fields: [
+                { key: 'state', label: 'Stan', type: 'text', default: 'next', help: '„next” = następny, „previous” = poprzedni albo nazwa stanu, np. Wł.' },
+            ],
+            run: async (c, ctx) => {
+                const { folderId, key } = ctx;
+                if (!folderId || !key) throw new Error('Tę akcję trzeba wywołać z przycisku na decku');
+                ctx.deck.setState(folderId, key, c.state || 'next');
+            },
+        },
+        {
             id: 'delay',
             name: 'Czekaj',
             description: 'Pauza między akcjami',

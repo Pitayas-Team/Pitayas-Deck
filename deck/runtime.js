@@ -60,8 +60,12 @@ function createRuntime({ store, userPluginsDir, log, notify, services = {} }) {
         variables.delete(name);
         for (const fn of varListeners) { try { fn(name, undefined); } catch {} }
     }
-    function render(text) {
-        return String(text || '').replace(/\{([\w.\-]+)\}/g, (m, name) => (variables.has(name) ? formatValue(variables.get(name).value) : m));
+    // locals: wartości dostępne tylko w danej akcji, np. {value} z suwaka
+    function render(text, locals) {
+        return String(text || '').replace(/\{([\w.\-]+)\}/g, (m, name) => {
+            if (locals && name in locals) return formatValue(locals[name]);
+            return variables.has(name) ? formatValue(variables.get(name).value) : m;
+        });
     }
     function variablesUsed(text) {
         return [...String(text || '').matchAll(/\{([\w.\-]+)\}/g)].map((m) => m[1]);
@@ -182,7 +186,7 @@ function createRuntime({ store, userPluginsDir, log, notify, services = {} }) {
         for (const f of action.fields || []) config[f.key] = f.default;
         Object.assign(config, item.config || {});
         // W polach tekstowych można używać zmiennych: {system.time}
-        for (const [k, v] of Object.entries(config)) if (typeof v === 'string') config[k] = render(v);
+        for (const [k, v] of Object.entries(config)) if (typeof v === 'string') config[k] = render(v, extra.locals);
         await action.run(config, makeCtx(item.plugin, extra));
     }
     // Sekwencja akcji jednego przycisku: po kolei, błąd jednej nie zatrzymuje reszty

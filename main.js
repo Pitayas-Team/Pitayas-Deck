@@ -14,6 +14,7 @@ const { createStore } = require('./deck/store');
 const { createRuntime } = require('./deck/runtime');
 const { createServer } = require('./deck/server');
 const { createPlatform } = require('./deck/platform');
+const { importMacroDeck, macroDeckDir } = require('./deck/import-macrodeck');
 
 const ICON = path.join(__dirname, 'build', 'icons', '512x512.png');
 const log = (...a) => core.log.info(...a);
@@ -153,7 +154,7 @@ const snapshot = () => ({
 });
 ipcMain.handle('deck:get', () => snapshot());
 ipcMain.handle('deck:preview', (e, folderId) => server.folderState(folderId));
-ipcMain.handle('deck:render', (e, button) => server.renderButton(button));
+ipcMain.handle('deck:render', (e, button, folderId, key) => server.renderButton(button, folderId, key));
 ipcMain.handle('deck:variables', () => runtime.listVariables());
 
 ipcMain.handle('deck:set-button', (e, folderId, key, button) => store.setButton(folderId, key, button));
@@ -164,6 +165,19 @@ ipcMain.handle('deck:profile-delete', (e, id) => store.deleteProfile(id));
 ipcMain.handle('deck:folder-add', (e, parentId, name) => store.addFolder(parentId, name));
 ipcMain.handle('deck:folder-rename', (e, id, name) => store.renameFolder(id, name));
 ipcMain.handle('deck:folder-delete', (e, id) => store.deleteFolder(id));
+ipcMain.handle('deck:folder-grid', (e, id, cols, rows) => store.folderGrid(id, cols, rows));
+ipcMain.handle('deck:set-state', (e, folderId, key, stateId) => store.setWidgetState(folderId, key, stateId));
+
+// Ikony Lucide (ISC) dla wyszukiwarki w edytorze
+let lucideCache = null;
+ipcMain.handle('deck:lucide', () => {
+    if (!lucideCache) lucideCache = JSON.parse(fs.readFileSync(path.join(__dirname, 'shared', 'lucide.json'), 'utf8'));
+    return lucideCache;
+});
+
+// Import z Macro Deck
+ipcMain.handle('deck:macrodeck-available', () => Boolean(macroDeckDir()));
+ipcMain.handle('deck:import-macrodeck', () => importMacroDeck(store, { log }));
 
 ipcMain.handle('deck:settings', async (e, patch) => {
     const s = store.setSettings(patch);
@@ -183,6 +197,12 @@ ipcMain.handle('deck:test-actions', async (e, actions) => {
     const errors = await runtime.runActions(actions, { device: 'editor', button: null, folderId: null });
     return { ok: !errors.length, errors };
 });
+// „Testuj” w edytorze: jak naciśnięcie na telefonie (ze zmianą stanu i kontekstem przycisku)
+ipcMain.handle('deck:test-button', async (e, folderId, key, phase = 'press') => {
+    const errors = await server.trigger('editor', folderId, key, phase);
+    return { ok: !errors.length, errors };
+});
+ipcMain.handle('deck:test-slider', (e, folderId, key, value) => server.slider('editor', folderId, key, value));
 ipcMain.handle('deck:variable-set', (e, name, value, type) => runtime.setUserVariable(name, value, type));
 ipcMain.handle('deck:variable-delete', (e, name) => runtime.deleteUserVariable(name));
 ipcMain.handle('deck:open-plugins-dir', () => {

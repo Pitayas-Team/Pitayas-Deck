@@ -18,16 +18,16 @@ function defaultDeck() {
                 name: 'Start',
                 parent: null,
                 buttons: {
-                    '0,0': { label: 'Witaj!', icon: { type: 'emoji', value: '🐉' }, bg: '#e6007e', color: '#ffffff', actions: { press: [] } },
-                    '1,0': { label: '{system.time}', icon: { type: 'none' }, bg: '#23222a', color: '#ffffff', fontSize: 20, labelPos: 'center', actions: { press: [] } },
-                    '2,0': { label: 'Głośniej', icon: { type: 'glyph', value: 'volume-up' }, bg: '#23222a', color: '#ffffff', actions: { press: [{ plugin: 'media', action: 'volume', config: { mode: 'up', step: 5 } }] } },
-                    '3,0': { label: 'Ciszej', icon: { type: 'glyph', value: 'volume-down' }, bg: '#23222a', color: '#ffffff', actions: { press: [{ plugin: 'media', action: 'volume', config: { mode: 'down', step: 5 } }] } },
-                    '4,0': { label: 'Wycisz', icon: { type: 'glyph', value: 'volume-off' }, bg: '#23222a', color: '#ffffff', stateVar: 'media.muted', on: { bg: '#ff5d73', label: 'Wyciszone' }, actions: { press: [{ plugin: 'media', action: 'volume', config: { mode: 'mute' } }] } },
-                    '0,1': { label: 'Poprzedni', icon: { type: 'glyph', value: 'prev' }, bg: '#23222a', color: '#ffffff', actions: { press: [{ plugin: 'media', action: 'media', config: { command: 'previous' } }] } },
-                    '1,1': { label: 'Graj / pauza', icon: { type: 'glyph', value: 'play-pause' }, bg: '#23222a', color: '#ffffff', actions: { press: [{ plugin: 'media', action: 'media', config: { command: 'play-pause' } }] } },
-                    '2,1': { label: 'Następny', icon: { type: 'glyph', value: 'next' }, bg: '#23222a', color: '#ffffff', actions: { press: [{ plugin: 'media', action: 'media', config: { command: 'next' } }] } },
-                    '3,1': { label: 'CPU {system.cpu}%', icon: { type: 'glyph', value: 'chip' }, bg: '#23222a', color: '#ffffff', actions: { press: [] } },
-                    '4,1': { label: 'Mikrofon', icon: { type: 'glyph', value: 'mic' }, bg: '#23222a', color: '#ffffff', stateVar: 'media.micMuted', on: { bg: '#ff5d73', icon: { type: 'glyph', value: 'mic-off' }, label: 'Mikrofon wył.' }, actions: { press: [{ plugin: 'media', action: 'mic', config: { mode: 'toggle' } }] } },
+                    '0,0': { type: 'clock', w: 2, h: 1, bg: '#e6007e', color: '#ffffff', clock: { seconds: false, date: true }, actions: {} },
+                    '2,0': { type: 'media', w: 2, h: 2, bg: '#23222a', media: { album: false, timeline: true }, actions: {} },
+                    '4,0': { type: 'slider', w: 1, h: 2, label: 'Głośność', bg: '#23222a', slider: { preset: 'volume', orientation: 'vertical', showValue: true, min: 0, max: 100, step: 1 }, actions: {} },
+                    '0,1': { label: 'Wycisz', icon: { type: 'lucide', value: 'volume-x' }, bg: '#23222a', labelShadow: true, stateVar: 'media.muted', on: { bg: '#ff5d73', label: 'Wyciszone' }, actions: { press: [{ plugin: 'media', action: 'volume', config: { mode: 'mute' } }] } },
+                    '1,1': { label: 'Mikrofon', icon: { type: 'lucide', value: 'mic' }, bg: '#23222a', labelShadow: true, stateVar: 'media.micMuted', on: { bg: '#ff5d73', icon: { type: 'lucide', value: 'mic-off' }, label: 'Mikrofon wył.' }, actions: { press: [{ plugin: 'media', action: 'mic', config: { mode: 'toggle' } }] } },
+                    '0,2': { label: 'Poprzedni', icon: { type: 'lucide', value: 'skip-back' }, bg: '#23222a', labelShadow: true, actions: { press: [{ plugin: 'media', action: 'media', config: { command: 'previous' } }] } },
+                    '1,2': { label: 'Graj / pauza', icon: { type: 'lucide', value: 'play' }, bg: '#23222a', labelShadow: true, stateVar: 'media.playing', on: { icon: { type: 'lucide', value: 'pause' } }, actions: { press: [{ plugin: 'media', action: 'media', config: { command: 'play-pause' } }] } },
+                    '2,2': { label: 'Następny', icon: { type: 'lucide', value: 'skip-forward' }, bg: '#23222a', labelShadow: true, actions: { press: [{ plugin: 'media', action: 'media', config: { command: 'next' } }] } },
+                    '3,2': { type: 'gauge', w: 1, h: 1, bg: '#23222a', gaugeStyle: 'ring', gauges: [{ var: 'system.cpu', name: 'CPU', max: 100, unit: '%' }], actions: {} },
+                    '4,2': { label: 'Zablokuj', icon: { type: 'lucide', value: 'lock' }, bg: '#2f2e38', labelShadow: true, actions: { press: [{ plugin: 'system', action: 'lock', config: {} }] } },
                 },
             },
         },
@@ -50,6 +50,7 @@ function createStore(dataDir, log = () => {}) {
     // Uzupełnienie brakujących pól po aktualizacjach
     const def = defaultDeck();
     for (const key of ['profiles', 'folders', 'variables', 'devices', 'settings']) if (!deck[key]) deck[key] = def[key];
+    if (!deck.widgetStates) deck.widgetStates = {};   // aktywny stan przycisków wielostanowych: "<folder>/<x,y>" → id stanu
     deck.settings = { ...def.settings, ...deck.settings };
     if (!deck.profiles.length) { deck.profiles = def.profiles; deck.folders = { ...deck.folders, ...def.folders }; }
 
@@ -106,8 +107,31 @@ function createStore(dataDir, log = () => {}) {
             if (patch.name !== undefined) p.name = String(patch.name).slice(0, 60) || p.name;
             if (patch.cols !== undefined) p.cols = Math.max(1, Math.min(12, parseInt(patch.cols, 10) || p.cols));
             if (patch.rows !== undefined) p.rows = Math.max(1, Math.min(10, parseInt(patch.rows, 10) || p.rows));
+            // Wygląd profilu: odstęp między przyciskami (% pola), zaokrąglenie (%), tło decka
+            if (patch.spacing !== undefined) p.spacing = Math.max(0, Math.min(40, parseInt(patch.spacing, 10) || 0));
+            if (patch.radius !== undefined) p.radius = Math.max(0, Math.min(50, parseInt(patch.radius, 10) || 0));
+            if (patch.background !== undefined) p.background = String(patch.background || '');
             changed('profiles');
             return p;
+        },
+        // Własny rozmiar siatki folderu (puste = jak w profilu)
+        folderGrid(id, cols, rows) {
+            const f = deck.folders[id];
+            if (!f) return null;
+            f.cols = cols ? Math.max(1, Math.min(12, parseInt(cols, 10))) : undefined;
+            f.rows = rows ? Math.max(1, Math.min(10, parseInt(rows, 10))) : undefined;
+            changed('folders');
+            return f;
+        },
+        gridOf(folderId) {
+            const f = deck.folders[folderId];
+            const p = api.profileOfFolder(folderId) || deck.profiles[0];
+            return { cols: (f && f.cols) || p.cols, rows: (f && f.rows) || p.rows };
+        },
+        widgetState: (folderId, key) => deck.widgetStates[`${folderId}/${key}`],
+        setWidgetState(folderId, key, stateId) {
+            deck.widgetStates[`${folderId}/${key}`] = stateId;
+            changed('states', { folderId, key });
         },
         deleteProfile(id) {
             if (deck.profiles.length <= 1) return false;

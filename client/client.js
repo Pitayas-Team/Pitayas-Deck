@@ -57,7 +57,13 @@
         ws.onmessage = (e) => {
             let msg;
             try { msg = JSON.parse(e.data); } catch { return; }
-            if (msg.t === 'state') { state = msg; screen(null); render(); }
+            if (msg.t === 'state') {
+                const sliding = state && state.sliding;
+                state = msg;
+                screen(null);
+                if (sliding) { state.sliding = sliding; return; }
+                render();
+            }
             else if (msg.t === 'pending') screen('Zatwierdź na komputerze', `To urządzenie (<b>${escapeHtml(msg.name)}</b>) czeka na zgodę w aplikacji Pitaya Deck na komputerze.`);
             else if (msg.t === 'denied') screen('Brak dostępu', 'Komputer odrzucił to urządzenie. Możesz je odblokować w Pitaya Deck → Urządzenia.', false);
             else if (msg.t === 'toast') toast(msg.text, msg.kind);
@@ -73,20 +79,25 @@
     const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
     // ───── Siatka ─────
+    let cellSize = 100;
     function layout() {
-        if (!state) return;
+        if (!state) return 100;
         const { cols, rows } = state.profile;
+        const sp = (state.style.spacing ?? 10) / 100;
         const box = wrap.getBoundingClientRect();
         // Pionowy telefon i szeroka siatka: podpowiadamy obrót (zabiera trochę miejsca na dole)
         const portraitHint = box.height > box.width * 1.25 && cols > rows;
         $('rotateHint').hidden = !portraitHint;
         const W = box.width - 24, H = box.height - 18 - (portraitHint ? 32 : 0);
-        const gap = Math.max(6, Math.min(16, Math.min(W / cols, H / rows) * 0.1));
-        const cell = Math.floor(Math.min((W - gap * (cols - 1)) / cols, (H - gap * (rows - 1)) / rows));
+        const cell = Math.floor(Math.min(W / (cols + (cols - 1) * sp), H / (rows + (rows - 1) * sp)));
+        const gap = Math.round(cell * sp);
         grid.style.setProperty('--gap', `${gap}px`);
         grid.style.setProperty('--cell', `${cell}px`);
+        grid.style.setProperty('--pd-radius', `${Math.round((cell * (state.style.radius ?? 22)) / 100)}px`);
         grid.style.gridTemplateColumns = `repeat(${cols}, ${cell}px)`;
         grid.style.gridTemplateRows = `repeat(${rows}, ${cell}px)`;
+        document.body.style.background = state.style.background || '';
+        cellSize = cell;
         return cell;
     }
     function render() {
@@ -96,29 +107,47 @@
         $('btnBack').hidden = !state.folder.canBack;
         $('clock').hidden = !state.settings.showClock;
         const cell = layout();
-        const total = cols * rows;
-        while (grid.children.length < total) grid.appendChild(makeCell());
-        while (grid.children.length > total) grid.lastChild.remove();
-        for (let y = 0; y < rows; y++) {
-            for (let x = 0; x < cols; x++) {
-                const el = grid.children[y * cols + x];
-                const key = `${x},${y}`;
-                el.dataset.key = key;
-                PitayaDeckRender.paint(el, state.buttons[key] || null, cell);
-            }
+        // Widżet zajmuje w×h pól od swojego lewego górnego rogu; zajęte pola nie dostają pustych kafelków
+        const covered = new Set();
+        const items = [];
+        for (const [key, b] of Object.entries(state.buttons)) {
+            const [x, y] = key.split(',').map(Number);
+            if (x >= cols || y >= rows) continue;
+            const w = Math.min(b.w || 1, cols - x), h = Math.min(b.h || 1, rows - y);
+            for (let dx = 0; dx < w; dx++) for (let dy = 0; dy < h; dy++) covered.add(`${x + dx},${y + dy}`);
+            items.push({ key, x, y, w, h, b });
+        }
+        for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) if (!covered.has(`${x},${y}`)) items.push({ key: `${x},${y}`, x, y, w: 1, h: 1, b: null });
+        grid.innerHTML = '';
+        for (const it of items) {
+            const el = makeCell(it.key);
+            el.style.gridColumn = `${it.x + 1} / span ${it.w}`;
+            el.style.gridRow = `${it.y + 1} / span ${it.h}`;
+            PitayaDeckRender.paint(el, it.b, cell);
+            if (it.b && it.b.type === 'media' && it.w < 2) el.classList.add('narrow');
+            grid.appendChild(el);
         }
     }
 
     // Krótkie dotknięcie = „press”, przytrzymanie = „long” (tylko gdy przycisk ma taką akcję), puszczenie = „release”
-    function makeCell() {
+    function makeCell(key) {
         const el = document.createElement('div');
+        el.dataset.key = key;
         let timer = null;
         let longSent = false;
         let active = false;
-        const button = () => state && state.buttons[el.dataset.key];
+        const button = () => state && state.buttons[key];
         el.addEventListener('pointerdown', (e) => {
             const b = button();
             if (!b) return;
+            // Przyciski odtwarzacza w widżecie muzyki
+            const mbtn = e.target.closest('[data-media]');
+            if (b.type === 'media') {
+                if (mbtn) { e.preventDefault(); if (navigator.vibrate) navigator.vibrate(12); send({ t: 'media', key, cmd: mbtn.dataset.media }); }
+                return;
+            }
+            if (b.type === 'slider') return startSlider(e, el, key);
+            if (b.type === 'clock' || b.type === 'gauge') { if (!b.hasActions) {} }
             e.preventDefault();
             active = true;
             longSent = false;
@@ -129,10 +158,10 @@
                 timer = setTimeout(() => {
                     longSent = true;
                     if (navigator.vibrate) navigator.vibrate([10, 40, 20]);
-                    send({ t: 'press', key: el.dataset.key, phase: 'long' });
+                    send({ t: 'press', key, phase: 'long' });
                 }, LONG_MS);
             } else {
-                send({ t: 'press', key: el.dataset.key, phase: 'press' });
+                send({ t: 'press', key, phase: 'press' });
             }
         });
         const up = (cancelled) => {
@@ -142,14 +171,51 @@
             el.classList.remove('pressed');
             const b = button();
             if (!b) return;
-            if (b.hasLong && !longSent && !cancelled) send({ t: 'press', key: el.dataset.key, phase: 'press' });
-            send({ t: 'press', key: el.dataset.key, phase: 'release' });
+            if (b.hasLong && !longSent && !cancelled) send({ t: 'press', key, phase: 'press' });
+            send({ t: 'press', key, phase: 'release' });
         };
         el.addEventListener('pointerup', () => up(false));
         el.addEventListener('pointercancel', () => up(true));
         el.addEventListener('contextmenu', (e) => e.preventDefault());
         return el;
     }
+
+    // Suwak: wartość z pozycji palca, wysyłana na bieżąco; rysujemy od razu, bez czekania na komputer
+    function startSlider(e, el, key) {
+        e.preventDefault();
+        const box = el.querySelector('.pd-sl');
+        const track = el.querySelector('.pd-sl-track');
+        if (!box || !track) return;
+        const vertical = box.classList.contains('vertical');
+        const min = parseFloat(box.dataset.min), max = parseFloat(box.dataset.max), step = parseFloat(box.dataset.step) || 1;
+        const fill = el.querySelector('.pd-sl-fill');
+        const valueEl = el.querySelector('.pd-sl-value');
+        let last = null;
+        const apply = (ev) => {
+            const r = track.getBoundingClientRect();
+            const f = vertical ? 1 - (ev.clientY - r.top) / r.height : (ev.clientX - r.left) / r.width;
+            const v = Math.round((min + Math.max(0, Math.min(1, f)) * (max - min)) / step) * step;
+            if (v === last) return;
+            last = v;
+            fill.style.setProperty('--pct', `${((v - min) / (max - min)) * 100}%`);
+            if (valueEl) valueEl.textContent = valueEl.textContent.replace(/^-?[\d.,]+/, String(Math.round(v)));
+            send({ t: 'slider', key, value: v });
+        };
+        state.sliding = key;
+        try { el.setPointerCapture(e.pointerId); } catch {}
+        apply(e);
+        const move = (ev) => apply(ev);
+        const end = () => {
+            el.removeEventListener('pointermove', move);
+            el.removeEventListener('pointerup', end);
+            el.removeEventListener('pointercancel', end);
+            setTimeout(() => { if (state.sliding === key) state.sliding = null; }, 600);
+        };
+        el.addEventListener('pointermove', move);
+        el.addEventListener('pointerup', end);
+        el.addEventListener('pointercancel', end);
+    }
+    setInterval(() => PitayaDeckRender.tickClocks(grid), 1000);
 
     // ───── Pasek ─────
     $('btnBack').addEventListener('click', () => send({ t: 'nav', to: 'back' }));
