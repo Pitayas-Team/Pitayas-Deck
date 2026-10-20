@@ -60,6 +60,7 @@ async function startServer() {
         try {
             await server.start(p);
             if (p !== base) toEditor('deck:notify', `Port ${base} był zajęty — deck działa na porcie ${p}.`, 'info');
+            publishStatus();
             return p;
         } catch (err) {
             if (err.code !== 'EADDRINUSE') { core.log.error('Serwer:', err); break; }
@@ -100,9 +101,20 @@ function createWindow() {
     });
 }
 
+// Stan dla rodziny Pitayas (hub, `node Pitayas-Core/cli.js send deck status`)
+function publishStatus() {
+    const devices = server.devicesList();
+    core.setStatus({
+        port: server.port || null,
+        url: server.port && server.urls()[0] ? server.urls()[0].url : null,
+        devicesOnline: devices.filter((d) => d.online).length,
+        devices: devices.length,
+    });
+}
 function updateTray() {
     if (!tray) return;
     const online = server.devicesList().filter((d) => d.online).length;
+    publishStatus();
     tray.setToolTip(`Pitaya Deck — ${online ? `połączone urządzenia: ${online}` : 'brak połączonych urządzeń'}`);
 }
 function createTray() {
@@ -127,6 +139,7 @@ async function quit() {
 
 if (core.singleInstance(showWindow)) {
     core.registerIpc({ beforeRestart: async () => { isQuitting = true; store.flush(); await server.stop(); platform.dispose(); } });
+    core.onQuit(quit);
     app.whenReady().then(async () => {
         createWindow();
         createTray();
