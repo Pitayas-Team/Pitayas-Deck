@@ -33,6 +33,7 @@ const runtime = createRuntime({
     notify: (text, kind) => toEditor('deck:notify', text, kind),
     services: {
         platform,
+        getPort: () => (server ? server.port : 0),
         desktopNotify: (body) => new Notification({ title: 'Pitaya Deck', body: String(body || ''), icon: ICON }).show(),
     },
 });
@@ -191,6 +192,8 @@ ipcMain.handle('deck:settings', async (e, patch) => {
 
 // ───── Wtyczki i zmienne ─────
 ipcMain.handle('deck:plugin-settings', (e, id, patch) => runtime.setPluginSettings(id, patch));
+ipcMain.handle('deck:plugin-command', async (e, id, key) => { const r = await runtime.pluginCommand(id, key); return { result: r === undefined ? null : r, plugins: runtime.describe() }; });
+runtime.onStatus(() => toEditor('deck:plugins', runtime.describe()));
 ipcMain.handle('deck:plugin-toggle', (e, id, disabled) => { runtime.setDisabled(id, disabled); return runtime.describe(); });
 ipcMain.handle('deck:field-options', (e, pluginId, actionId, key) => runtime.fieldOptions(pluginId, actionId, key));
 ipcMain.handle('deck:test-actions', async (e, actions) => {

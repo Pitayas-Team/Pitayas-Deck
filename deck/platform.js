@@ -263,7 +263,7 @@ function createPlatform({ clipboard, shell, log = () => {} }) {
         const num = (re, text) => { const m = (text || '').match(re); return m ? parseInt(m[1], 10) : 0; };
         return {
             ...empty,
-            title: str('xesam:title'), artist: str('xesam:artist'), album: str('xesam:album'), artUrl: str('mpris:artUrl'),
+            title: str('xesam:title'), url: str('xesam:url'), artist: str('xesam:artist'), album: str('xesam:album'), artUrl: str('mpris:artUrl'),
             status, player: player.replace('org.mpris.MediaPlayer2.', '').split('.')[0],
             length: Math.round(num(/'mpris:length':\s*<(?:uint64|int64)?\s*(\d+)>/, meta) / 1e6),
             position: Math.round(num(/(\d+)/, pos.replace(/^\(<(?:int64)?\s*/, '')) / 1e6),

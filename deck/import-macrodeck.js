@@ -17,9 +17,23 @@ function macroDeckDir() {
 // Zmienne Macro Deck → zmienne Pitaya Deck (dla reguł stanów, suwaków i wskaźników)
 const VARS = {
     system_cpu_usage_percent: 'system.cpu', system_ram_usage_percent: 'system.ram', system_gpu_0_usage_percent: 'system.gpu',
-    spotify_playing_shuffle: 'media.shuffle', spotify_is_playing: 'media.playing', spotify_playing: 'media.playing',
-    spotify_volume: 'media.playerVolume', system_volume: 'media.volume', obs_streaming: 'obs.streaming', obs_recording: 'obs.recording',
-    spotify_playing_loop: 'media.repeatOn', obs_obs_virtual_camera: 'obs.virtualcam', obs_virtual_camera: 'obs.virtualcam',
+    time: 'system.time', date: 'system.date', system_volume: 'media.volume', obs_streaming: 'obs.streaming', obs_recording: 'obs.recording',
+    obs_obs_virtual_camera: 'obs.virtualcam', obs_virtual_camera: 'obs.virtualcam',
+    // Spotify
+    spotify_playing_shuffle: 'spotify.shuffle', spotify_shuffle_enabled: 'spotify.shuffle', spotify_is_playing: 'spotify.playing', spotify_playing: 'spotify.playing',
+    spotify_volume: 'spotify.volume', spotify_playing_loop: 'spotify.repeatOn', spotify_repeat_mode: 'spotify.repeat', spotify_is_connected: 'spotify.connected',
+    spotify_current_track_name: 'spotify.title', spotify_current_artist: 'spotify.artist', spotify_current_album: 'spotify.album', spotify_album_art_url: 'spotify.art',
+    spotify_current_track_url: 'spotify.url', spotify_current_track_is_liked: 'spotify.liked', spotify_current_position: 'spotify.positionText',
+    spotify_track_duration: 'spotify.durationText', spotify_progress_percentage: 'spotify.progress', spotify_device_name: 'spotify.device',
+    spotify_device_type: 'spotify.deviceType', spotify_playback_state: 'spotify.state', spotify_top_track: 'spotify.topTrack', spotify_top_tracks: 'spotify.topTracks',
+    spotify_top_artist: 'spotify.topArtist', spotify_top_artists: 'spotify.topArtists',
+    // Discord
+    discord_is_connected: 'discord.connected', discord_is_muted: 'discord.muted', discord_is_deafened: 'discord.deafened', discord_is_self_muted: 'discord.selfMuted',
+    discord_is_self_deafened: 'discord.selfDeafened', discord_is_server_muted: 'discord.serverMuted', discord_is_server_deafened: 'discord.serverDeafened',
+    discord_is_speaking: 'discord.speaking', discord_is_in_voice_channel: 'discord.inVoice', discord_voice_channel: 'discord.channel', discord_voice_server: 'discord.server',
+    discord_voice_ping: 'discord.ping', discord_voice_connection_state: 'discord.voiceState', discord_voice_mode: 'discord.voiceMode', discord_input_volume: 'discord.inputVolume',
+    discord_output_volume: 'discord.outputVolume', discord_noise_suppression: 'discord.noiseSuppression', discord_echo_cancellation: 'discord.echoCancellation',
+    discord_automatic_gain_control: 'discord.autoGain', discord_user_name: 'discord.user',
 };
 const mapVar = (v) => VARS[v] || v;
 
@@ -61,7 +75,7 @@ function importMacroDeck(store, { log = () => {} } = {}) {
         if (src.labelPosition) out.labelPos = { top: 'top', center: 'center', bottom: 'bottom', hidden: 'hidden' }[src.labelPosition] || 'bottom';
         if (src.fontSize) out.fontSize = Math.max(8, Math.round(src.fontSize));
         if (src.icon) out.icon = iconOf(src.icon, src.iconDisplay);
-        if (src.label !== undefined) out.label = String(src.label).replace(/^\s+$/, '');
+        if (src.label !== undefined) out.label = String(src.label).replace(/^\s+$/, '').replace(/\{([\w.\-]+)\}/g, (m, n) => `{${mapVar(n)}}`);
         return out;
     }
 
@@ -74,14 +88,22 @@ function importMacroDeck(store, { log = () => {} } = {}) {
         switch (bt) {
             case 'app.macro-deck.deck.change-folder': return { plugin: 'deck', action: 'open-folder', config: { folder: folderMap.get(v('folderId')) || '' } };
             case 'app.macro-deck.deck.go-back': return { plugin: 'deck', action: 'back' };
-            case 'app.macro-deck.spotify.play-playlist': return { plugin: 'media', action: 'play-uri', config: { uri: v('playlist') || '', player: 'spotify' } };
-            case 'app.macro-deck.spotify.next': return { plugin: 'media', action: 'media', config: { command: 'next', player: 'spotify' } };
-            case 'app.macro-deck.spotify.previous': return { plugin: 'media', action: 'media', config: { command: 'previous', player: 'spotify' } };
-            case 'app.macro-deck.spotify.toggle-play-pause': return { plugin: 'media', action: 'media', config: { command: 'play-pause', player: 'spotify' } };
-            case 'app.macro-deck.spotify.toggle-shuffle': return { plugin: 'media', action: 'shuffle', config: { mode: v('mode') === 'on' || v('mode') === 'off' ? v('mode') : 'toggle', player: 'spotify' } };
-            case 'app.macro-deck.spotify.set-repeat-mode': return { plugin: 'media', action: 'repeat', config: { mode: { track: 'track', context: 'playlist', playlist: 'playlist', off: 'off' }[v('mode')] || 'cycle', player: 'spotify' } };
-            case 'app.macro-deck.discord.mute': return { plugin: 'discord', action: 'mute' };
-            case 'app.macro-deck.discord.deafen': return { plugin: 'discord', action: 'deafen' };
+            case 'app.macro-deck.spotify.play-playlist': return { plugin: 'spotify', action: 'play-playlist', config: { uri: v('playlist') || v('uri') || '', playlist: '', shuffle: '' } };
+            case 'app.macro-deck.spotify.play-track': return { plugin: 'spotify', action: 'play-uri', config: { uri: v('track') || v('uri') || '' } };
+            case 'app.macro-deck.spotify.toggle-like': case 'app.macro-deck.spotify.toggle-liked': return { plugin: 'spotify', action: 'like', config: { mode: 'toggle' } };
+            case 'app.macro-deck.spotify.set-volume': return { plugin: 'spotify', action: 'volume', config: { mode: 'set', value: v('volume') ?? v('value') ?? 50 } };
+            case 'app.macro-deck.spotify.play-on-device': return { plugin: 'spotify', action: 'device', config: { device: v('device') || v('deviceName') || '', play: true } };
+            case 'app.macro-deck.spotify.next': return { plugin: 'spotify', action: 'next' };
+            case 'app.macro-deck.spotify.previous': return { plugin: 'spotify', action: 'previous' };
+            case 'app.macro-deck.spotify.toggle-play-pause': return { plugin: 'spotify', action: 'play-pause', config: { mode: 'toggle' } };
+            case 'app.macro-deck.spotify.toggle-shuffle': return { plugin: 'spotify', action: 'shuffle', config: { mode: v('mode') === 'on' || v('mode') === 'off' ? v('mode') : 'toggle' } };
+            case 'app.macro-deck.spotify.set-repeat-mode': return { plugin: 'spotify', action: 'repeat', config: { mode: { track: 'track', context: 'context', playlist: 'context', off: 'off' }[String(v('mode') || '').toLowerCase()] || 'cycle' } };
+            case 'app.macro-deck.discord.mute': case 'app.macro-deck.discord.toggle-mute': return { plugin: 'discord', action: 'mute', config: { mode: { mute: 'on', unmute: 'off', on: 'on', off: 'off' }[v('action') || v('mode')] || 'toggle' } };
+            case 'app.macro-deck.discord.set-voice-mode': return { plugin: 'discord', action: 'voice-mode', config: { mode: 'toggle' } };
+            case 'app.macro-deck.discord.leave-voice-channel': return { plugin: 'discord', action: 'leave' };
+            case 'app.macro-deck.discord.set-input-volume': return { plugin: 'discord', action: 'input-volume', config: { mode: 'set', value: v('volume') ?? 100 } };
+            case 'app.macro-deck.discord.set-output-volume': return { plugin: 'discord', action: 'output-volume', config: { mode: 'set', value: v('volume') ?? 100 } };
+            case 'app.macro-deck.discord.deafen': case 'app.macro-deck.discord.toggle-deafen': return { plugin: 'discord', action: 'deafen', config: { mode: 'toggle' } };
             case 'app.macro-deck.obs.set-scene': return { plugin: 'obs', action: 'scene', config: { scene: v('scene') || '' } };
             case 'app.macro-deck.obs.toggle-virtual-camera': return { plugin: 'obs', action: 'virtualcam' };
             case 'app.macro-deck.obs.toggle-stream': return { plugin: 'obs', action: 'stream', config: { mode: 'toggle' } };
@@ -154,8 +176,15 @@ function importMacroDeck(store, { log = () => {} } = {}) {
         if (w.type === 'Slider') {
             const v = data.valueVariable || '';
             const preset = /spotify.*volume/i.test(v) ? 'player' : /system.*volume|^volume$/i.test(v) ? 'volume' : /mic/i.test(v) ? 'mic' : 'custom';
-            return { ...base, type: 'slider', label: data.showLabel === false ? '' : (data.label || ''), bg: data.backgroundColor || '#23222a',
-                slider: { preset, player: preset === 'player' ? 'spotify' : '', var: preset === 'custom' ? mapVar(v) : '', orientation: data.orientation || 'vertical', showValue: Boolean(data.showValue), min: 0, max: 100, step: 1 },
+            const label = data.showLabel === false ? '' : (data.label || '');
+            // Głośność Spotify: przez wtyczkę Spotify (działa też z telefonem i głośnikiem po zalogowaniu)
+            if (preset === 'player') {
+                return { ...base, type: 'slider', label, bg: data.backgroundColor || '#23222a',
+                    slider: { preset: 'custom', var: 'spotify.volume', orientation: data.orientation || 'vertical', showValue: Boolean(data.showValue), min: 0, max: 100, step: 1 },
+                    actions: { change: [{ plugin: 'spotify', action: 'volume', config: { mode: 'set', value: '{value}' } }] } };
+            }
+            return { ...base, type: 'slider', label, bg: data.backgroundColor || '#23222a',
+                slider: { preset, player: '', var: preset === 'custom' ? mapVar(v) : '', orientation: data.orientation || 'vertical', showValue: Boolean(data.showValue), min: 0, max: 100, step: 1 },
                 actions: flows(data.flows) };
         }
         if (w.type === 'Clock') return { ...base, type: 'clock', bg: data.backgroundColor || '#23222a', clock: { seconds: Boolean(data.showSeconds), date: data.showDate !== false, h12: data.hourCycle === 'h12' }, actions: flows(data.flows) };

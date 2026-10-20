@@ -89,6 +89,8 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
             if (!current.startsWith('file://') || decodeURIComponent(current.slice(7)) !== f || !/\.(png|jpe?g|webp|gif)$/i.test(f)) { res.writeHead(404); res.end(); return; }
             return serveFile(res, f);
         }
+        const plug = p.match(/^\/p\/([\w-]+)(\/.*)?$/);
+        if (plug) return runtime.pluginHttp(plug[1], req, res, url);
         let file = null;
         if (p === '/' || p === '/index.html') file = path.join(appDir, 'client', 'index.html');
         else if (p.startsWith('/img/')) file = safe(store.imagesDir, p.slice(4));

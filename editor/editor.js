@@ -916,6 +916,8 @@
         const label = `<label class="m-label" for="${id}">${esc(f.label)}</label>`;
         const help = f.help ? `<div class="m-small">${esc(f.help)}</div>` : '';
         const attrs = `id="${id}" data-key="${esc(f.key)}" data-type="${f.type}"`;
+        if (f.type === 'button') return `<button class="m-btn small" data-cmd="${esc(f.key)}">${esc(f.label)}</button>${help}`;
+        if (f.type === 'info') return `<div class="plug-info">${esc(f.label)}${f.help ? `<br><span class="m-small">${esc(f.help)}</span>` : ''}</div>`;
         if (f.type === 'bool') return `<label class="check"><input type="checkbox" ${attrs} ${v ? 'checked' : ''}> ${esc(f.label)}</label>${help}`;
         if (f.type === 'textarea') return `<div class="m-field">${label}<textarea class="m-input" ${attrs} placeholder="${esc(f.placeholder || '')}">${esc(v ?? '')}</textarea>${help}</div>`;
         if (f.type === 'select') {
@@ -1203,25 +1205,38 @@
               <span style="flex:1"></span>
               <label class="check"><input type="checkbox" data-enable ${p.disabled ? '' : 'checked'}> Włączona</label></div>
             ${p.error ? `<div class="plug-err">Błąd: ${esc(p.error)}</div>` : ''}
+            ${p.status ? `<div class="plug-status ${p.status.ok ? 'ok' : 'bad'}"><span class="m-status-dot${p.status.ok ? ' active' : ''}"></span>${esc(p.status.text)}</div>` : ''}
             ${p.settings.map((s) => fieldHtml(s, p.values[s.key])).join('')}
             ${p.variables.length ? `<div class="m-small">Zmienne: ${p.variables.map((v) => `<code>{${esc(v.id)}}</code>`).join(' ')}</div>` : ''}
         </div>`).join('');
         $('pluginsList').querySelectorAll('.plug').forEach((box) => {
             const id = box.dataset.plugin;
+            box.querySelectorAll('[data-cmd]').forEach((btn) => btn.onclick = async () => {
+                btn.disabled = true;
+                try {
+                    await flushPluginSettings(box, id);
+                    const r = await deck.pluginCommand(id, btn.dataset.cmd);
+                    data.plugins = r.plugins;
+                    if (r.result) toast(String(r.result), 'success');
+                    renderPlugins();
+                } catch (err) { toast(err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), 'error'); btn.disabled = false; }
+            });
             box.querySelector('[data-enable]').onchange = async (e) => { data.plugins = await deck.pluginToggle(id, !e.target.checked); renderPlugins(); };
             let t = null;
             box.querySelectorAll('[data-key]').forEach((input) => {
                 input.addEventListener(input.dataset.type === 'bool' ? 'change' : 'input', () => {
                     clearTimeout(t);
-                    t = setTimeout(async () => {
-                        const patch = {};
-                        box.querySelectorAll('[data-key]').forEach((x) => { patch[x.dataset.key] = x.dataset.type === 'bool' ? x.checked : x.dataset.type === 'number' ? Number(x.value) : x.value; });
-                        await deck.pluginSettings(id, patch);
-                        optionsCache = {};
-                    }, 500);
+                    t = setTimeout(() => flushPluginSettings(box, id), 500);
                 });
             });
         });
+    }
+    async function flushPluginSettings(box, id) {
+        const patch = {};
+        box.querySelectorAll('[data-key]').forEach((x) => { patch[x.dataset.key] = x.dataset.type === 'bool' ? x.checked : x.dataset.type === 'number' ? Number(x.value) : x.value; });
+        if (!Object.keys(patch).length) return;
+        await deck.pluginSettings(id, patch);
+        optionsCache = {};
     }
     async function renderVars() {
         data.variables = await deck.variables();
@@ -1257,6 +1272,13 @@
     // ───── Zdarzenia z procesu głównego ─────
     deck.on('notify', (text, kind) => toast(text, kind));
     deck.on('devices', (list) => { if (!data) return; data.devices = list; renderDevices(); renderConnection(); });
+    deck.on('plugins', (list) => {
+        if (!data) return;
+        data.plugins = list;
+        const open = document.getElementById('modalSettings').classList.contains('active') && !$('pluginsList').closest('[data-spane]').hidden;
+        // Nie przerysowujemy, gdy ktoś właśnie pisze w polu ustawień
+        if (open && !$('pluginsList').contains(document.activeElement)) renderPlugins();
+    });
     deck.on('pairing', (d) => { if (!pairingQueue.some((x) => x.id === d.id)) pairingQueue.push(d); showPairing(); });
     deck.on('ready', async () => {
         if (!data) return load();

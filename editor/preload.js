@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('deck', {
     settings: invoke('deck:settings'),
     pluginSettings: invoke('deck:plugin-settings'),
     pluginToggle: invoke('deck:plugin-toggle'),
+    pluginCommand: invoke('deck:plugin-command'),
     fieldOptions: invoke('deck:field-options'),
     testActions: invoke('deck:test-actions'),
     setVariable: invoke('deck:variable-set'),

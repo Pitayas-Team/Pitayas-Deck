@@ -79,6 +79,7 @@ function createRuntime({ store, userPluginsDir, log, notify, services = {} }) {
         for (const s of (def && def.def.settings) || []) if (s.default !== undefined) defaults[s.key] = s.default;
         return { ...defaults, ...(all[id] || {}) };
     }
+    const statusListeners = new Set();
     function makeCtx(id, extra = {}) {
         return {
             plugin: id,
@@ -90,6 +91,20 @@ function createRuntime({ store, userPluginsDir, log, notify, services = {} }) {
             },
             getVariable,
             setUserVariable,
+            // Zapis ustawień bez wywoływania settingsChanged (np. tokeny logowania)
+            saveSettings: (patch) => {
+                const all = { ...(store.deck.settings.plugins || {}) };
+                all[id] = { ...(all[id] || {}), ...patch };
+                store.setSettings({ plugins: all });
+            },
+            // Krótki opis stanu w ustawieniach wtyczki, np. „Zalogowano jako …”
+            setStatus: (text, ok = true) => {
+                const p = plugins.get(id);
+                if (!p || (p.status && p.status.text === text && p.status.ok === ok)) return;
+                p.status = text ? { text: String(text), ok: Boolean(ok) } : null;
+                for (const fn of statusListeners) { try { fn(id); } catch {} }
+            },
+            serverPort: () => (services.getPort ? services.getPort() : 0),
             log: (...a) => log(`[${id}]`, ...a),
             notify: (text, type = 'info') => notify(text, type),
             deck: deckApi,
@@ -153,7 +168,9 @@ function createRuntime({ store, userPluginsDir, log, notify, services = {} }) {
             error: p.error || null,
             disabled: isDisabled(id),
             settings: (p.def.settings || []).map(({ key, label, type, default: d, placeholder, help }) => ({ key, label, type, default: d, placeholder, help })),
-            values: pluginSettings(id),
+            // Tylko zadeklarowane pola — tokeny logowania zostają w procesie głównym
+            values: Object.fromEntries((p.def.settings || []).filter((x) => x.type !== 'button' && x.type !== 'info').map((x) => [x.key, pluginSettings(id)[x.key]])),
+            status: p.status || null,
             variables: (p.def.variables || []).map(({ id: vid, label }) => ({ id: `${id}.${vid}`, label })),
             actions: p.def.actions.map((a) => ({
                 id: a.id,
@@ -173,6 +190,24 @@ function createRuntime({ store, userPluginsDir, log, notify, services = {} }) {
         const f = a && (a.fields || []).find((x) => x.key === key);
         if (!f || typeof f.options !== 'function') return [];
         try { return await f.options(makeCtx(pluginId)); } catch (err) { return [{ value: '', label: `Błąd: ${err.message}` }]; }
+    }
+
+    // Przycisk w ustawieniach wtyczki (np. „Zaloguj do Spotify”)
+    async function pluginCommand(id, key) {
+        const p = plugins.get(id);
+        const fn = p && p.def.commands && p.def.commands[key];
+        if (!fn) throw new Error('Nieznane polecenie wtyczki');
+        if (isDisabled(id)) throw new Error('Wtyczka jest wyłączona');
+        return fn(makeCtx(id));
+    }
+    // Adresy /p/<wtyczka>/… na serwerze decka (np. powrót z logowania OAuth)
+    async function pluginHttp(id, req, res, url) {
+        const p = plugins.get(id);
+        if (!p || !p.def.http || isDisabled(id)) { res.writeHead(404); res.end(); return; }
+        try { await p.def.http(req, res, url, makeCtx(id)); } catch (err) {
+            if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+            res.end(`Błąd: ${err.message}`);
+        }
     }
 
     // ───── Akcje ─────
@@ -204,7 +239,8 @@ function createRuntime({ store, userPluginsDir, log, notify, services = {} }) {
     }
 
     return {
-        startAll, stopAll, describe, fieldOptions, runActions, setPluginSettings, pluginSettings,
+        startAll, stopAll, describe, fieldOptions, runActions, pluginCommand, pluginHttp,
+        onStatus: (fn) => { statusListeners.add(fn); return () => statusListeners.delete(fn); }, setPluginSettings, pluginSettings,
         setVariable, getVariable, setUserVariable, deleteUserVariable, render, variablesUsed, formatValue,
         listVariables: () => [...variables.entries()].map(([name, v]) => ({ name, label: v.label, plugin: v.plugin, value: v.value, text: formatValue(v.value) })),
         onVariable: (fn) => { varListeners.add(fn); return () => varListeners.delete(fn); },
