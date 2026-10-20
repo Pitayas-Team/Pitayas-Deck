@@ -1,0 +1,14 @@
+{
+  "name": "Pitaya Deck",
+  "short_name": "Pitaya Deck",
+  "description": "Przyciski Pitaya Deck na telefonie i tablecie",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#121116",
+  "theme_color": "#121116",
+  "icons": [
+    { "src": "/icons/256x256.png", "sizes": "256x256", "type": "image/png" },
+    { "src": "/icons/512x512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

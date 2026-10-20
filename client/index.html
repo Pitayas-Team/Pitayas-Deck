@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#121116">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Pitaya Deck">
+  <title>Pitaya Deck</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="/icons/128x128.png">
+  <link rel="apple-touch-icon" href="/icons/256x256.png">
+  <link rel="stylesheet" href="/shared/render.css">
+  <link rel="stylesheet" href="client.css">
+</head>
+<body>
+  <header class="bar" id="bar">
+    <button class="bar-btn" id="btnBack" title="Wstecz" hidden>
+      <svg viewBox="0 0 24 24"><path d="M14 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="bar-title"><span id="folderName">Pitaya Deck</span><small id="profileName"></small></div>
+    <span class="bar-clock" id="clock"></span>
+    <button class="bar-btn" id="btnFull" title="Pełny ekran">
+      <svg viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </header>
+
+  <main class="grid-wrap" id="wrap">
+    <div class="grid" id="grid"></div>
+    <div class="rotate-hint" id="rotateHint" hidden>
+      <svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 14a9 9 0 0 0 6 6M21 10a9 9 0 0 0-6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      Obróć telefon poziomo — przyciski będą większe
+    </div>
+  </main>
+
+  <!-- Ekrany: łączenie / oczekiwanie na zatwierdzenie / odmowa -->
+  <div class="screen" id="screen">
+    <div class="screen-card">
+      <img src="/icons/256x256.png" alt="" class="screen-logo">
+      <div class="screen-title" id="screenTitle">Łączenie…</div>
+      <div class="screen-text" id="screenText">Łączę się z Pitaya Deck na komputerze.</div>
+      <div class="spinner" id="spinner"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="/shared/render.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>

@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Pitaya Deck</title>
+  <link rel="stylesheet" href="../core/ui/pitaya-theme.css">
+  <link rel="stylesheet" href="../shared/render.css">
+  <link rel="stylesheet" href="editor.css">
+</head>
+<body>
+  <!-- PASEK OKNA -->
+  <div class="m-titlebar">
+    <div class="m-titlebar-brand">
+      <img src="../build/icons/128x128.png" alt="">
+      <span class="m-titlebar-name">Pitaya Deck</span>
+    </div>
+    <button class="conn-pill" id="connPill" title="Połącz telefon"><span class="m-status-dot" id="connDot"></span><span id="connText">Uruchamianie…</span></button>
+    <div class="m-titlebar-actions">
+      <button class="m-btn small accent" id="btnConnect">Połącz telefon</button>
+      <div class="m-update-pill" id="updatePill" title="Dostępna aktualizacja">Aktualizacja</div>
+      <button class="m-win-btn" id="btnSettings" title="Ustawienia" onclick="openSettings('general')"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span class="m-dot"></span></button>
+      <div class="m-win-sep"></div>
+      <button class="m-win-btn" data-win="min" title="Minimalizuj"><svg viewBox="0 0 12 12"><path d="M1 6.5h10"/></svg></button>
+      <button class="m-win-btn" id="btnMax" title="Maksymalizuj"><svg viewBox="0 0 12 12"><rect x="1.5" y="1.5" width="9" height="9"/></svg></button>
+      <button class="m-win-btn close" data-win="close" title="Schowaj do zasobnika (deck działa dalej)"><svg viewBox="0 0 12 12"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9"/></svg></button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <!-- LEWY PANEL -->
+    <aside class="side">
+      <section class="side-sec">
+        <div class="sec-head"><span class="m-label">Profil</span>
+          <div class="sec-tools">
+            <button class="tool" id="btnProfileAdd" title="Nowy profil">＋</button>
+            <button class="tool" id="btnProfileRename" title="Zmień nazwę">✎</button>
+            <button class="tool" id="btnProfileDelete" title="Usuń profil">🗑</button>
+          </div>
+        </div>
+        <select class="m-select" id="profileSelect"></select>
+        <div class="grid-size">
+          <label>Kolumny <input type="number" class="m-input" id="colsInput" min="1" max="12"></label>
+          <span>×</span>
+          <label>Wiersze <input type="number" class="m-input" id="rowsInput" min="1" max="10"></label>
+        </div>
+      </section>
+
+      <section class="side-sec grow">
+        <div class="sec-head"><span class="m-label">Foldery</span>
+          <div class="sec-tools">
+            <button class="tool" id="btnFolderAdd" title="Nowy folder w bieżącym">＋</button>
+            <button class="tool" id="btnFolderRename" title="Zmień nazwę">✎</button>
+            <button class="tool" id="btnFolderDelete" title="Usuń folder">🗑</button>
+          </div>
+        </div>
+        <div class="tree" id="tree"></div>
+      </section>
+
+      <section class="side-sec">
+        <div class="sec-head"><span class="m-label">Urządzenia</span></div>
+        <div class="devices" id="devices"></div>
+      </section>
+    </aside>
+
+    <!-- ŚRODEK: SIATKA -->
+    <main class="center">
+      <div class="crumbs" id="crumbs"></div>
+      <div class="stage" id="stage">
+        <div class="deck-grid" id="grid"></div>
+      </div>
+      <div class="hint">Kliknij pole, żeby dodać lub edytować przycisk · przeciągnij, żeby przenieść · prawy przycisk myszy: kopiuj / wklej / usuń</div>
+    </main>
+
+    <!-- PRAWY PANEL: INSPEKTOR -->
+    <aside class="inspector" id="inspector">
+      <div class="insp-empty" id="inspEmpty">
+        <div class="insp-empty-icon">▦</div>
+        <div class="m-panel-title">Wybierz pole</div>
+        <div class="m-small">Kliknij dowolne pole siatki, żeby utworzyć przycisk albo zmienić istniejący.</div>
+      </div>
+
+      <div class="insp" id="insp" hidden>
+        <div class="insp-head">
+          <div class="insp-preview" id="inspPreview"></div>
+          <div class="insp-title">
+            <div class="m-panel-title" id="inspTitle">Przycisk</div>
+            <div class="m-small" id="inspPos"></div>
+          </div>
+          <button class="m-btn small" id="btnTest" title="Uruchom akcje naciśnięcia">▶ Testuj</button>
+        </div>
+
+        <div class="m-tabs insp-tabs">
+          <button class="m-tab active" data-tab="look">Wygląd</button>
+          <button class="m-tab" data-tab="actions">Akcje <span class="tab-count" id="actionsCount"></span></button>
+          <button class="m-tab" data-tab="state">Stan</button>
+        </div>
+
+        <!-- WYGLĄD -->
+        <div class="insp-body" data-pane="look">
+          <div class="m-field">
+            <label class="m-label" for="fLabel">Napis</label>
+            <div class="with-btn">
+              <input class="m-input" id="fLabel" placeholder="np. Scena 1 albo {system.time}">
+              <button class="m-btn small icon-only" id="btnInsertVar" title="Wstaw zmienną">{ }</button>
+            </div>
+          </div>
+          <div class="row2">
+            <div class="m-field">
+              <label class="m-label" for="fLabelPos">Położenie napisu</label>
+              <select class="m-select" id="fLabelPos">
+                <option value="bottom">Pod ikoną</option><option value="top">Nad ikoną</option>
+                <option value="center">Na środku</option><option value="hidden">Bez napisu</option>
+              </select>
+            </div>
+            <div class="m-field">
+              <label class="m-label" for="fFont">Rozmiar napisu <span id="fFontVal"></span></label>
+              <input type="range" id="fFont" min="9" max="34">
+            </div>
+          </div>
+
+          <div class="m-field">
+            <span class="m-label">Ikona</span>
+            <div class="seg" id="iconType">
+              <button data-v="none">Brak</button><button data-v="glyph">Ikona</button><button data-v="emoji">Emoji</button><button data-v="image">Obraz</button>
+            </div>
+            <div class="icon-pane" data-icon="glyph"><div class="glyphs" id="glyphs"></div></div>
+            <div class="icon-pane" data-icon="emoji">
+              <input class="m-input" id="fEmoji" maxlength="8" placeholder="Wklej emoji, np. 🎮">
+              <div class="emojis" id="emojis"></div>
+            </div>
+            <div class="icon-pane" data-icon="image">
+              <div class="row-btns">
+                <button class="m-btn small" id="btnImage">Wybierz obraz…</button>
+                <label class="check"><input type="checkbox" id="fImageFill"> Wypełnij cały przycisk</label>
+              </div>
+              <div class="m-small">Albo przeciągnij obraz na przycisk w siatce.</div>
+            </div>
+          </div>
+
+          <div class="row2">
+            <div class="m-field">
+              <span class="m-label">Tło</span>
+              <div class="colors" id="bgColors"></div>
+            </div>
+            <div class="m-field">
+              <span class="m-label">Kolor napisu</span>
+              <div class="colors" id="fgColors"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- AKCJE -->
+        <div class="insp-body" data-pane="actions" hidden>
+          <div class="seg small" id="phase">
+            <button data-v="press" class="active">Naciśnięcie</button><button data-v="longPress">Przytrzymanie</button><button data-v="release">Puszczenie</button>
+          </div>
+          <div class="m-small phase-hint" id="phaseHint"></div>
+          <div class="actions-list" id="actionsList"></div>
+          <button class="m-btn block" id="btnAddAction">＋ Dodaj akcję</button>
+        </div>
+
+        <!-- STAN -->
+        <div class="insp-body" data-pane="state" hidden>
+          <div class="m-small">Przycisk może zmieniać wygląd, gdy zmienna jest włączona — np. czerwony, gdy trwa nagrywanie albo mikrofon jest wyciszony.</div>
+          <div class="m-field">
+            <label class="m-label" for="fStateVar">Zmienna stanu</label>
+            <select class="m-select" id="fStateVar"></select>
+          </div>
+          <div class="state-on" id="stateOn">
+            <div class="m-label">Wygląd, gdy włączone</div>
+            <div class="m-field">
+              <label class="m-label" for="fOnLabel">Napis (puste = bez zmian)</label>
+              <input class="m-input" id="fOnLabel" placeholder="np. NAGRYWAM">
+            </div>
+            <div class="m-field">
+              <span class="m-label">Tło</span>
+              <div class="colors" id="onBgColors"></div>
+            </div>
+            <div class="m-field">
+              <label class="m-label" for="fOnGlyph">Ikona (puste = bez zmian)</label>
+              <select class="m-select" id="fOnGlyph"></select>
+            </div>
+            <button class="m-btn small" id="btnMakeToggle">Zrób z tego przełącznik</button>
+            <div class="m-small">Dodaje akcję „Przełącz zmienną” — każde naciśnięcie włącza albo wyłącza stan.</div>
+          </div>
+        </div>
+
+        <div class="insp-foot">
+          <button class="m-btn small" id="btnDuplicate">Duplikuj</button>
+          <button class="m-btn small danger" id="btnDelete">Usuń przycisk</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- MENU KONTEKSTOWE -->
+  <div class="ctx" id="ctxMenu" hidden>
+    <button data-cmd="copy">Kopiuj</button>
+    <button data-cmd="paste">Wklej</button>
+    <button data-cmd="duplicate">Duplikuj w następne wolne pole</button>
+    <button data-cmd="folder">Utwórz folder z przyciskiem</button>
+    <button data-cmd="delete" class="danger">Usuń</button>
+  </div>
+
+  <!-- MODAL: POŁĄCZ TELEFON -->
+  <div class="m-modal-overlay" id="modalConnect">
+    <div class="m-modal wide">
+      <div class="m-modal-header">
+        <span class="m-modal-title">Połącz telefon albo tablet</span>
+        <button class="m-modal-close" onclick="PitayaUI.closeModal('modalConnect')">✕</button>
+      </div>
+      <div class="m-modal-body connect">
+        <img class="qr" id="qrImg" alt="Kod QR">
+        <div class="connect-info">
+          <ol class="steps">
+            <li>Połącz telefon z <b>tą samą siecią Wi‑Fi</b> co komputer.</li>
+            <li>Zeskanuj kod QR aparatem albo wpisz adres w przeglądarce.</li>
+            <li>Zatwierdź nowe urządzenie tutaj, w Pitaya Deck.</li>
+            <li>W menu przeglądarki wybierz „Dodaj do ekranu głównego” — deck otworzy się jak aplikacja.</li>
+          </ol>
+          <div class="urls" id="urls"></div>
+          <label class="check"><input type="checkbox" id="fApproval"> Pytaj o zgodę przy nowym urządzeniu</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: NOWE URZĄDZENIE -->
+  <div class="m-modal-overlay" id="modalPairing">
+    <div class="m-modal">
+      <div class="m-modal-header"><span class="m-modal-title">Nowe urządzenie</span></div>
+      <div class="m-modal-body">
+        <div class="pair"><div class="pair-icon">📱</div><div><b id="pairName">Urządzenie</b><div class="m-small" id="pairIp"></div></div></div>
+        <div class="m-small">Zatwierdzone urządzenie może naciskać przyciski decka na tym komputerze.</div>
+      </div>
+      <div class="m-modal-footer">
+        <button class="m-btn small danger" id="btnPairDeny">Odrzuć</button>
+        <button class="m-btn small accent" id="btnPairOk">Zezwól</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: WYBÓR AKCJI -->
+  <div class="m-modal-overlay" id="modalAction">
+    <div class="m-modal wide">
+      <div class="m-modal-header">
+        <span class="m-modal-title">Dodaj akcję</span>
+        <button class="m-modal-close" onclick="PitayaUI.closeModal('modalAction')">✕</button>
+      </div>
+      <div class="m-modal-body">
+        <input class="m-input" id="actionSearch" placeholder="Szukaj: scena, głośność, skrót…">
+        <div class="action-picker" id="actionPicker"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ZMIENNE (wstawianie do napisu) -->
+  <div class="m-modal-overlay" id="modalVars">
+    <div class="m-modal">
+      <div class="m-modal-header">
+        <span class="m-modal-title">Wstaw zmienną</span>
+        <button class="m-modal-close" onclick="PitayaUI.closeModal('modalVars')">✕</button>
+      </div>
+      <div class="m-modal-body"><div class="var-list" id="varPicker"></div></div>
+    </div>
+  </div>
+
+  <!-- MODAL: USTAWIENIA -->
+  <div class="m-modal-overlay" id="modalSettings">
+    <div class="m-modal wide tall">
+      <div class="m-modal-header">
+        <span class="m-modal-title">Ustawienia</span>
+        <button class="m-modal-close" onclick="PitayaUI.closeModal('modalSettings')">✕</button>
+      </div>
+      <div class="m-tabs settings-tabs" id="settingsTabs">
+        <button class="m-tab" data-stab="general">Ogólne</button>
+        <button class="m-tab" data-stab="plugins">Wtyczki</button>
+        <button class="m-tab" data-stab="vars">Zmienne</button>
+        <button class="m-tab" data-stab="about">O programie</button>
+      </div>
+      <div class="m-modal-body">
+        <div data-spane="general">
+          <div class="row2">
+            <div class="m-field">
+              <label class="m-label" for="fPort">Port serwera</label>
+              <input class="m-input" type="number" id="fPort" min="1024" max="65535">
+            </div>
+            <div class="m-field">
+              <span class="m-label">Klawiatura</span>
+              <div class="m-small" id="kbStatus">Sprawdzanie…</div>
+            </div>
+          </div>
+          <label class="check"><input type="checkbox" id="fApproval2"> Pytaj o zgodę przy nowym urządzeniu</label>
+          <label class="check"><input type="checkbox" id="fClock"> Pokazuj zegar na telefonie</label>
+          <div class="m-field">
+            <span class="m-label">Kopia zapasowa</span>
+            <div class="row-btns">
+              <button class="m-btn small" id="btnExport">Eksportuj deck…</button>
+              <button class="m-btn small" id="btnImport">Importuj deck…</button>
+            </div>
+          </div>
+        </div>
+        <div data-spane="plugins" hidden>
+          <div class="row-btns spaced">
+            <div class="m-small">Wtyczki dodają akcje i zmienne. Własne wtyczki wrzuć do folderu wtyczek (każda w swoim folderze z plikiem index.js).</div>
+            <button class="m-btn small" id="btnPluginsDir">Folder wtyczek</button>
+          </div>
+          <div class="plugins" id="pluginsList"></div>
+        </div>
+        <div data-spane="vars" hidden>
+          <div class="row-btns">
+            <input class="m-input" id="newVarName" placeholder="Nazwa nowej zmiennej, np. licznik">
+            <button class="m-btn small accent" id="btnNewVar">Dodaj</button>
+          </div>
+          <div class="var-list" id="varsList"></div>
+        </div>
+        <div data-spane="about" hidden>
+          <div class="m-about">
+            <img src="../build/icons/128x128.png" alt="">
+            <div>
+              <div class="m-about-name">Pitaya Deck</div>
+              <div class="m-about-desc">Twój telefon jako panel przycisków do komputera</div>
+              <div class="m-small">Wersja: <span id="appVersionText">—</span></div>
+            </div>
+          </div>
+          <div class="m-update-card">
+            <div class="m-update-head">
+              <div>
+                <div class="m-update-title">Aktualizacje z GitHub</div>
+                <div class="m-update-status" id="updateStatusText">Sprawdź, czy jest nowsza wersja w repozytorium</div>
+              </div>
+              <button class="m-btn small" id="btnCheckUpdate">Sprawdź</button>
+            </div>
+            <div class="m-update-details" id="updateDetails">
+              <div id="updateInfo"></div>
+              <div style="display:flex; gap:8px;">
+                <button class="m-btn small success" id="btnApplyUpdate">Zainstaluj aktualizację</button>
+                <button class="m-btn small accent" id="btnRestartApp" style="display:none;">Uruchom ponownie</button>
+              </div>
+            </div>
+          </div>
+          <div class="m-field">
+            <span class="m-label">Folder danych (Pitaya Core)</span>
+            <div class="data-row"><code id="dataDirText">—</code><button class="m-btn small" id="btnOpenDataDir">Otwórz</button></div>
+          </div>
+          <div class="m-small">Repozytorium: <a class="m-link" id="repoLink" href="#">github.com/MangoLabz/Pitayas-Deck</a></div>
+          <button class="m-btn small danger" id="btnQuit">Zakończ Pitaya Deck</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../shared/render.js"></script>
+  <script src="../core/ui/pitaya-ui.js"></script>
+  <script src="editor.js"></script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+const { contextBridge, ipcRenderer } = require('electron');
+const { makeBridge } = require('../core/bridge');
+
+const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
+
+contextBridge.exposeInMainWorld('deck', {
+    get: invoke('deck:get'),
+    preview: invoke('deck:preview'),
+    render: invoke('deck:render'),
+    variables: invoke('deck:variables'),
+    setButton: invoke('deck:set-button'),
+    moveButton: invoke('deck:move-button'),
+    addProfile: invoke('deck:profile-add'),
+    updateProfile: invoke('deck:profile-update'),
+    deleteProfile: invoke('deck:profile-delete'),
+    addFolder: invoke('deck:folder-add'),
+    renameFolder: invoke('deck:folder-rename'),
+    deleteFolder: invoke('deck:folder-delete'),
+    settings: invoke('deck:settings'),
+    pluginSettings: invoke('deck:plugin-settings'),
+    pluginToggle: invoke('deck:plugin-toggle'),
+    fieldOptions: invoke('deck:field-options'),
+    testActions: invoke('deck:test-actions'),
+    setVariable: invoke('deck:variable-set'),
+    deleteVariable: invoke('deck:variable-delete'),
+    openPluginsDir: invoke('deck:open-plugins-dir'),
+    keyboardStatus: invoke('deck:keyboard-status'),
+    pickFile: invoke('deck:pick-file'),
+    saveImageData: invoke('deck:save-image-data'),
+    exportDeck: invoke('deck:export'),
+    importDeck: invoke('deck:import'),
+    approve: invoke('deck:approve'),
+    updateDevice: invoke('deck:device-update'),
+    removeDevice: invoke('deck:device-remove'),
+    qr: invoke('deck:qr'),
+    openUrl: invoke('deck:open-url'),
+    maximize: () => ipcRenderer.send('deck:win-maximize'),
+    quit: () => ipcRenderer.send('deck:quit'),
+    on: (channel, cb) => ipcRenderer.on(`deck:${channel}`, (e, ...args) => cb(...args)),
+});
+
+// Pasek okna, folder danych i aktualizacje — Pitaya Core
+contextBridge.exposeInMainWorld('pitayaBridge', makeBridge(ipcRenderer));
