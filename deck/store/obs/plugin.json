@@ -1,0 +1,33 @@
+{
+  "id": "obs",
+  "name": "OBS Studio",
+  "version": "1.1.0",
+  "icon": "clapperboard",
+  "color": "#7c5cff",
+  "category": "streaming",
+  "featured": true,
+  "description": "Sceny, transmisja, nagrywanie, powtórki, źródła i wirtualna kamera.",
+  "longDescription": "Steruje OBS Studio przez wbudowany w OBS serwer WebSocket (od wersji 28). Przyciski mogą świecić, gdy trwa nagrywanie albo transmisja.",
+  "features": [
+    "Przełącz scenę",
+    "Start / stop transmisji i nagrywania",
+    "Zapisz powtórkę",
+    "Wycisz źródło dźwięku",
+    "Pokaż / ukryj źródło",
+    "Wirtualna kamera"
+  ],
+  "tags": [
+    "obs",
+    "stream",
+    "nagrywanie",
+    "sceny"
+  ],
+  "changelog": [
+    {
+      "version": "1.1.0",
+      "notes": "Dodatek przeniesiony do sklepu."
+    }
+  ],
+  "author": "Pitayas",
+  "license": "MIT"
+}

@@ -1,0 +1,38 @@
+{
+  "id": "spotify",
+  "name": "Spotify",
+  "version": "1.1.0",
+  "icon": "music",
+  "color": "#1db954",
+  "category": "music",
+  "featured": true,
+  "description": "Odtwarzanie, playlisty, polubienia, losowo, powtarzanie, głośność i urządzenia.",
+  "longDescription": "Steruje Spotify na tym komputerze od razu, bez logowania. Po zalogowaniu własną aplikacją Spotify (bez podawania hasła w decku) dochodzą polubienia, lista Twoich playlist, przełączanie na telefon lub głośnik i statystyki słuchania.",
+  "features": [
+    "Graj / pauza, następny, poprzedni",
+    "Odtwórz playlistę z listy albo z linku",
+    "Polub utwór",
+    "Losowo i powtarzanie",
+    "Głośność Spotify (także suwakiem)",
+    "Przełącz urządzenie",
+    "Top utwory i wykonawcy jako zmienne"
+  ],
+  "tags": [
+    "muzyka",
+    "spotify",
+    "playlista",
+    "odtwarzacz"
+  ],
+  "changelog": [
+    {
+      "version": "1.1.0",
+      "notes": "Dodatek przeniesiony do sklepu. Playlisty podane samym identyfikatorem (z Macro Deck) działają."
+    },
+    {
+      "version": "1.0.0",
+      "notes": "Pierwsza wersja: Web API z logowaniem PKCE i sterowanie lokalne."
+    }
+  ],
+  "author": "Pitayas",
+  "license": "MIT"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "timer",
+  "name": "Minutnik",
+  "version": "1.0.0",
+  "author": "Pitayas",
+  "license": "MIT",
+  "icon": "timer",
+  "color": "#f59e0b",
+  "category": "productivity",
+  "description": "Odliczanie, stoper i pomodoro na przyciskach.",
+  "longDescription": "Ustaw przycisk na 5 minut odliczania, uruchom stoper albo pracuj w rytmie pomodoro. Pozostały czas pokażesz na przycisku zmienną {timer.remaining}.",
+  "features": [
+    "Odliczanie z pauzą i dodawaniem czasu",
+    "Stoper z międzyczasem",
+    "Pomodoro z przerwami",
+    "Powiadomienie i dźwięk po zakończeniu"
+  ],
+  "tags": [
+    "minutnik",
+    "stoper",
+    "pomodoro",
+    "czas"
+  ],
+  "changelog": [
+    {
+      "version": "1.0.0",
+      "notes": "Pierwsza wersja."
+    }
+  ]
+}

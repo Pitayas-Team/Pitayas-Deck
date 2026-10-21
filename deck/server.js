@@ -166,6 +166,8 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
             on: Boolean(st && st.index > 0),
             stateName: st && st.state && st.state.name ? st.state.name : '',
             hasLong: Boolean(w.actions && w.actions.longPress && w.actions.longPress.length),
+            // Które wyzwalacze mają bloki — telefon wie, czy czekać na przytrzymanie / drugie dotknięcie
+            triggers: Object.fromEntries(['longPress', 'doublePress', 'touchStart', 'release'].map((t) => [t, Boolean(w.actions && w.actions[t] && w.actions[t].length)])),
         };
         const num = (name) => { const v = parseFloat(runtime.getVariable(name)); return isNaN(v) ? 0 : v; };
         if (out.type === 'slider') {
@@ -244,11 +246,36 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
     // Zmiana zmiennej odświeża tylko urządzenia, które ją pokazują (z ograniczeniem częstotliwości)
     const dirty = new Set();
     let flushTimer = null;
+    // Wyzwalacz „Zmiana stanu”: pamiętamy ostatni stan przycisków, które mają takie bloki
+    const lastStates = new Map();
+    let stateTimer = null;
+    function checkStateChanges() {
+        stateTimer = null;
+        for (const f of Object.values(store.deck.folders)) {
+            for (const [key, w] of Object.entries(f.buttons || {})) {
+                const list = w.actions && w.actions.stateChange;
+                if (!list || !list.length) continue;
+                const st = activeState(w, f.id, key);
+                const id = st ? st.state.id : null;
+                const k = `${f.id}/${key}`;
+                if (!lastStates.has(k)) { lastStates.set(k, id); continue; }
+                if (lastStates.get(k) === id) continue;
+                lastStates.set(k, id);
+                runtime.runActions(list, { device: 'deck', button: w, folderId: f.id, key, locals: { state: st ? st.state.name || id : '', stateId: id } });
+            }
+        }
+    }
+    const scheduleStateCheck = () => { if (!stateTimer) stateTimer = setTimeout(checkStateChanges, 60); };
+    setTimeout(checkStateChanges, 1500);
     runtime.onVariable((name) => {
+        scheduleStateCheck();
         for (const [ws, s] of sessions) if (s.approved && s.vars && s.vars.has(name)) dirty.add(ws);
         if (dirty.size && !flushTimer) flushTimer = setTimeout(() => { flushTimer = null; for (const ws of dirty) pushState(ws); dirty.clear(); }, 80);
     });
-    store.onChange((what) => { if (['buttons', 'folders', 'profiles', 'all', 'settings', 'states'].includes(what)) pushAll(); });
+    store.onChange((what) => {
+        if (['buttons', 'folders', 'profiles', 'all', 'settings', 'states'].includes(what)) pushAll();
+        if (what === 'states' || what === 'buttons') scheduleStateCheck();
+    });
 
     // ───── API dla wtyczek (ctx.deck) ─────
     const deckApi = {
@@ -347,7 +374,7 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
         }
         if (!s || !s.approved) return;
         if (msg.t === 'press') {
-            const phase = { press: 'press', long: 'longPress', release: 'release' }[msg.phase];
+            const phase = { press: 'press', long: 'longPress', double: 'doublePress', down: 'touchStart', release: 'release' }[msg.phase];
             if (phase) trigger(s.deviceId, s.folderId, String(msg.key), phase);
             return;
         }

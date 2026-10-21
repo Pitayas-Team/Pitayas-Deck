@@ -1,0 +1,28 @@
+{
+  "id": "weather",
+  "name": "Pogoda",
+  "version": "1.1.0",
+  "icon": "cloud-sun",
+  "color": "#38bdf8",
+  "category": "productivity",
+  "description": "Temperatura i prognoza dla Twojego miasta (Open-Meteo, bez klucza).",
+  "longDescription": "Pobiera pogodę z darmowego serwisu Open-Meteo. Wpisz miasto w ustawieniach i użyj zmiennych na przyciskach, np. {weather.temp}°.",
+  "features": [
+    "Temperatura, odczuwalna, min i max",
+    "Opis i ikona pogody",
+    "Wilgotność i wiatr"
+  ],
+  "tags": [
+    "pogoda",
+    "temperatura",
+    "prognoza"
+  ],
+  "changelog": [
+    {
+      "version": "1.1.0",
+      "notes": "Dodatek przeniesiony do sklepu."
+    }
+  ],
+  "author": "Pitayas",
+  "license": "MIT"
+}

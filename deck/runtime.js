@@ -15,7 +15,8 @@
 //   }
 // ctx: { settings, setVariable(id, value), getVariable(name), log, notify(text, type), deck, device, button }
 //
-// Wtyczki wbudowane: ./plugins, wtyczki użytkownika: ~/.config/Pitayas/Deck/data/plugins/<nazwa>/index.js
+// Wtyczki wbudowane: ./plugins, wtyczki ze sklepu i użytkownika: ~/.config/Pitayas/Deck/data/plugins/<nazwa>/index.js
+// (obok może leżeć plugin.json z opisem dla sklepu: wersja, autor, ikona, kategoria)
 const fs = require('fs');
 const path = require('path');
 
@@ -113,22 +114,80 @@ function createRuntime({ store, userPluginsDir, log, notify, services = {} }) {
         };
     }
 
+    // Wtyczki z folderu danych mogą używać bibliotek aplikacji (np. ws) — dokładamy node_modules aplikacji do ścieżek
+    const appModules = path.join(__dirname, '..', 'node_modules');
+    function withAppModules(mod) {
+        try { if (mod && Array.isArray(mod.paths) && !mod.paths.includes(appModules)) mod.paths.push(appModules); } catch {}
+    }
+    const Module = require('module');
+    const origResolve = Module._resolveFilename;
+    if (!Module.__pitayaDeckPatched) {
+        Module.__pitayaDeckPatched = true;
+        Module._resolveFilename = function (request, parent, ...rest) {
+            try { return origResolve.call(this, request, parent, ...rest); } catch (err) {
+                if (parent && parent.filename && parent.filename.startsWith(userPluginsDir)) {
+                    withAppModules(parent);
+                    return origResolve.call(this, request, parent, ...rest);
+                }
+                throw err;
+            }
+        };
+    }
+
+    function readManifest(dir) {
+        try { return JSON.parse(fs.readFileSync(path.join(dir, 'plugin.json'), 'utf8')); } catch { return null; }
+    }
+    function clearCache(dir) {
+        for (const key of Object.keys(require.cache)) if (key.startsWith(dir + path.sep)) delete require.cache[key];
+    }
+    // Jedna wtyczka z folderu; zwraca jej id
+    function loadOne(dir, builtin) {
+        const main = path.join(dir, 'index.js');
+        if (!fs.existsSync(main)) return null;
+        const name = path.basename(dir);
+        try {
+            clearCache(dir);
+            const def = require(main);
+            if (!def || !def.id || !Array.isArray(def.actions)) throw new Error('index.js musi eksportować { id, name, actions }');
+            if (plugins.has(def.id)) throw new Error(`wtyczka „${def.id}” jest już załadowana`);
+            plugins.set(def.id, { def, builtin, dir, manifest: readManifest(dir) });
+            return def.id;
+        } catch (err) {
+            plugins.set(`błąd:${name}`, { def: { id: `błąd:${name}`, name, actions: [] }, builtin, dir, error: err.message, manifest: readManifest(dir) });
+            log('Nie udało się wczytać wtyczki', name, err.message);
+            return `błąd:${name}`;
+        }
+    }
     function loadDir(dir, builtin) {
         if (!fs.existsSync(dir)) return;
         for (const name of fs.readdirSync(dir)) {
-            const main = path.join(dir, name, 'index.js');
-            if (!fs.existsSync(main)) continue;
-            try {
-                delete require.cache[require.resolve(main)];
-                const def = require(main);
-                if (!def || !def.id || !Array.isArray(def.actions)) throw new Error('index.js musi eksportować { id, name, actions }');
-                if (plugins.has(def.id)) throw new Error(`wtyczka „${def.id}” jest już załadowana`);
-                plugins.set(def.id, { def, builtin, dir: path.join(dir, name) });
-            } catch (err) {
-                plugins.set(`błąd:${name}`, { def: { id: `błąd:${name}`, name, actions: [] }, builtin, dir: path.join(dir, name), error: err.message });
-                log('Nie udało się wczytać wtyczki', name, err.message);
-            }
+            if (name.startsWith('.')) continue;
+            loadOne(path.join(dir, name), builtin);
         }
+    }
+    async function startPlugin(id) {
+        const p = plugins.get(id);
+        if (!p || p.error || !p.def.start || isDisabled(id)) return;
+        try { await p.def.start(makeCtx(id)); } catch (err) { p.error = err.message; log('Start wtyczki', id, err.message); }
+    }
+    // Instalacja ze sklepu w trakcie działania: wczytaj i uruchom
+    async function addPlugin(dir) {
+        const id = loadOne(dir, false);
+        if (id) await startPlugin(id);
+        return id;
+    }
+    // Odinstalowanie / aktualizacja: zatrzymaj i zapomnij (zmienne wtyczki znikają)
+    async function removePlugin(id) {
+        const p = plugins.get(id) || [...plugins.values()].find((x) => x.manifest && x.manifest.id === id);
+        if (!p) return null;
+        const key = p.def.id;
+        try { if (p.def.stop) await p.def.stop(); } catch {}
+        plugins.delete(key);
+        clearCache(p.dir);
+        for (const name of [...variables.keys()]) {
+            if (name.startsWith(`${key}.`)) { variables.delete(name); for (const fn of varListeners) { try { fn(name, undefined); } catch {} } }
+        }
+        return p.dir;
     }
 
     async function startAll() {
@@ -136,10 +195,7 @@ function createRuntime({ store, userPluginsDir, log, notify, services = {} }) {
         loadDir(path.join(__dirname, 'plugins'), true);
         fs.mkdirSync(userPluginsDir, { recursive: true });
         loadDir(userPluginsDir, false);
-        for (const [id, p] of plugins) {
-            if (p.error || !p.def.start || isDisabled(id)) continue;
-            try { await p.def.start(makeCtx(id)); } catch (err) { p.error = err.message; log('Start wtyczki', id, err.message); }
-        }
+        for (const id of [...plugins.keys()]) await startPlugin(id);
     }
     async function stopAll() {
         for (const [, p] of plugins) { try { if (p.def.stop) await p.def.stop(); } catch {} }
@@ -171,6 +227,11 @@ function createRuntime({ store, userPluginsDir, log, notify, services = {} }) {
             // Tylko zadeklarowane pola — tokeny logowania zostają w procesie głównym
             values: Object.fromEntries((p.def.settings || []).filter((x) => x.type !== 'button' && x.type !== 'info').map((x) => [x.key, pluginSettings(id)[x.key]])),
             status: p.status || null,
+            version: (p.manifest && p.manifest.version) || null,
+            author: (p.manifest && p.manifest.author) || (p.builtin ? 'Pitayas' : null),
+            icon: (p.manifest && p.manifest.icon) || null,
+            color: (p.manifest && p.manifest.color) || null,
+            fromStore: Boolean(p.manifest && p.manifest.store !== false && !p.builtin),
             variables: (p.def.variables || []).map(({ id: vid, label }) => ({ id: `${id}.${vid}`, label })),
             actions: p.def.actions.map((a) => ({
                 id: a.id,
@@ -224,22 +285,94 @@ function createRuntime({ store, userPluginsDir, log, notify, services = {} }) {
         for (const [k, v] of Object.entries(config)) if (typeof v === 'string') config[k] = render(v, extra.locals);
         await action.run(config, makeCtx(item.plugin, extra));
     }
-    // Sekwencja akcji jednego przycisku: po kolei, błąd jednej nie zatrzymuje reszty
-    async function runActions(list, extra = {}) {
-        const errors = [];
-        for (const item of list || []) {
-            if (!item || item.enabled === false) continue;
-            try { await runOne(item, extra); } catch (err) {
-                errors.push(err.message);
-                log('Akcja nie powiodła się:', item.plugin, item.action, err.message);
+    // ───── Bloki (jak w Macro Deck 3) ─────
+    // Lista bloków wykonuje się po kolei. Blok bez „kind” to akcja wtyczki { plugin, action, config }.
+    //   { kind: 'if', branches: [{ cond, blocks }], else: [...] }        Jeśli / W przeciwnym razie jeśli / W przeciwnym razie
+    //   { kind: 'switch', subject: '{zmienna}', cases: [{ value, blocks }], otherwise: [...] }
+    //   { kind: 'repeat', times: 3, blocks }     { kind: 'while', cond, blocks }
+    //   { kind: 'wait', ms }     { kind: 'break' } (wyjdź z pętli)     { kind: 'stop' } (zakończ całość)
+    // cond: { join: 'and'|'or', rules: [{ left: 'spotify.playing', op: 'isOn', right: '' }] }
+    // Każdy blok może mieć enabled: false (pominięty) i comment.
+    const num = (v) => (typeof v === 'number' ? v : typeof v === 'boolean' ? Number(v) : String(v ?? '').trim() !== '' && !isNaN(Number(String(v).replace(',', '.'))) ? Number(String(v).replace(',', '.')) : null);
+    const truthyValue = (v) => v === true || v === 1 || /^(true|on|wł\.?|1|yes|tak|playing)$/i.test(String(v ?? '').trim());
+    function ruleOk(r, extra) {
+        const name = String(r.left || '').replace(/^\{|\}$/g, '');
+        const has = Boolean(extra.locals && name in extra.locals) || variables.has(name);
+        const left = extra.locals && name in extra.locals ? extra.locals[name] : getVariable(name);
+        const right = render(r.right ?? '', extra.locals);
+        const ln = num(left), rn = num(right);
+        const ls = formatValue(left).toLowerCase(), rs = String(right).toLowerCase();
+        switch (r.op || 'is') {
+            case 'is': return ln !== null && rn !== null ? ln === rn : ls === rs || String(left ?? '').toLowerCase() === rs;
+            case 'isNot': return !(ln !== null && rn !== null ? ln === rn : ls === rs || String(left ?? '').toLowerCase() === rs);
+            case 'gt': return ln !== null && rn !== null && ln > rn;
+            case 'gte': return ln !== null && rn !== null && ln >= rn;
+            case 'lt': return ln !== null && rn !== null && ln < rn;
+            case 'lte': return ln !== null && rn !== null && ln <= rn;
+            case 'contains': return String(left ?? '').toLowerCase().includes(rs);
+            case 'startsWith': return String(left ?? '').toLowerCase().startsWith(rs);
+            case 'isEmpty': return String(left ?? '').trim() === '';
+            case 'isNotEmpty': return String(left ?? '').trim() !== '';
+            case 'isOn': return truthyValue(left);
+            case 'isOff': return !truthyValue(left);
+            case 'isAvailable': return has;
+            case 'isNotAvailable': return !has;
+            default: return false;
+        }
+    }
+    function condOk(cond, extra) {
+        const rules = (cond && cond.rules) || [];
+        if (!rules.length) return true;
+        return cond.join === 'or' ? rules.some((r) => ruleOk(r, extra)) : rules.every((r) => ruleOk(r, extra));
+    }
+    const LOOP_MAX = 1000;
+    async function runBlocks(list, extra, ctl) {
+        for (const b of list || []) {
+            if (ctl.stop || ctl.break) return;
+            if (!b || b.enabled === false) continue;
+            if (++ctl.steps > 20000) { ctl.errors.push('Za dużo kroków — przerwano (sprawdź pętle)'); ctl.stop = true; return; }
+            const kind = b.kind || 'action';
+            try {
+                if (kind === 'action') await runOne(b, extra);
+                else if (kind === 'wait') await new Promise((r) => setTimeout(r, Math.max(0, Math.min(3600000, Number(render(String(b.ms ?? 0), extra.locals)) || 0))));
+                else if (kind === 'if') {
+                    const branch = (b.branches || []).find((br) => condOk(br.cond, extra));
+                    await runBlocks(branch ? branch.blocks : b.else, extra, ctl);
+                } else if (kind === 'switch') {
+                    const subject = String(render(b.subject || '', extra.locals)).trim().toLowerCase();
+                    const hit = (b.cases || []).find((c) => String(render(String(c.value ?? ''), extra.locals)).trim().toLowerCase() === subject);
+                    await runBlocks(hit ? hit.blocks : b.otherwise, extra, ctl);
+                } else if (kind === 'repeat') {
+                    const times = Math.max(0, Math.min(LOOP_MAX, Math.round(Number(render(String(b.times ?? 1), extra.locals)) || 0)));
+                    for (let i = 0; i < times && !ctl.stop; i++) {
+                        await runBlocks(b.blocks, { ...extra, locals: { ...(extra.locals || {}), index: i + 1 } }, ctl);
+                        if (ctl.break) { ctl.break = false; break; }
+                    }
+                } else if (kind === 'while') {
+                    let i = 0;
+                    while (!ctl.stop && condOk(b.cond, extra) && i++ < LOOP_MAX) {
+                        await runBlocks(b.blocks, { ...extra, locals: { ...(extra.locals || {}), index: i } }, ctl);
+                        if (ctl.break) { ctl.break = false; break; }
+                        await new Promise((r) => setImmediate(r));   // nie blokuj aplikacji
+                    }
+                } else if (kind === 'break') ctl.break = true;
+                else if (kind === 'stop') ctl.stop = true;
+            } catch (err) {
+                ctl.errors.push(err.message);
+                log('Akcja nie powiodła się:', b.plugin || kind, b.action || '', err.message);
             }
         }
-        if (errors.length) notify(errors.join(' · '), 'error');
-        return errors;
+    }
+    // Sekwencja bloków jednego wyzwalacza: po kolei, błąd jednej akcji nie zatrzymuje reszty
+    async function runActions(list, extra = {}) {
+        const ctl = { stop: false, break: false, steps: 0, errors: [] };
+        await runBlocks(list, extra, ctl);
+        if (ctl.errors.length) notify(ctl.errors.join(' · '), 'error');
+        return ctl.errors;
     }
 
     return {
-        startAll, stopAll, describe, fieldOptions, runActions, pluginCommand, pluginHttp,
+        condOk, startAll, stopAll, describe, addPlugin, removePlugin, has: (id) => plugins.has(id), fieldOptions, runActions, pluginCommand, pluginHttp,
         onStatus: (fn) => { statusListeners.add(fn); return () => statusListeners.delete(fn); }, setPluginSettings, pluginSettings,
         setVariable, getVariable, setUserVariable, deleteUserVariable, render, variablesUsed, formatValue,
         listVariables: () => [...variables.entries()].map(([name, v]) => ({ name, label: v.label, plugin: v.plugin, value: v.value, text: formatValue(v.value) })),

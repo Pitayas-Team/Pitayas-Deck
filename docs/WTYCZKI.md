@@ -75,3 +75,32 @@ Akcja, która rzuci wyjątek, pokaże jego treść w edytorze; kolejne akcje prz
 | `ctx.notify(tekst, 'error')` | komunikat w edytorze |
 | `ctx.desktopNotify(tekst)` | powiadomienie systemowe |
 | `ctx.log(...)` | wpis w `logs/app.log` |
+
+## Sklep z dodatkami
+
+Dodatek do sklepu to zwykła wtyczka z dodatkowym plikiem `plugin.json` obok `index.js`:
+
+```json
+{
+  "id": "spotify", "name": "Spotify", "version": "1.1.0", "author": "Pitayas", "license": "MIT",
+  "icon": "music", "color": "#1db954", "category": "music",
+  "description": "Krótki opis na karcie",
+  "longDescription": "Dłuższy opis na stronie dodatku",
+  "features": ["Co dodaje — lista punktów"],
+  "tags": ["muzyka"],
+  "changelog": [{ "version": "1.1.0", "notes": "Co się zmieniło" }]
+}
+```
+
+- `icon` to nazwa ikony [Lucide](https://lucide.dev/icons), `category`: `music`, `communication`, `streaming`, `smart-home`, `productivity`, `system`, `gaming`.
+- Dodatki dołączone do aplikacji leżą w `deck/store/<id>/`. Instalacja kopiuje je do `~/.config/Pitayas/Deck/data/plugins/<id>/`.
+- Własny sklep: w oknie sklepu wpisz adres katalogu. Pod `<adres>/index.json` musi być
+  `{ "plugins": [ { …plugin.json…, "package": { "url": "https://…/spotify-1.1.0.tgz", "sha256": "…" } } ] }`.
+  Paczka `.tgz` zawiera folder z `plugin.json` i `index.js`; suma `sha256` jest sprawdzana przed instalacją.
+- Wtyczki z folderu danych mogą używać bibliotek aplikacji (np. `require('ws')`).
+
+## Bloki
+
+Akcje przycisku to bloki, jak w Macro Deck 3. Wtyczka dostarcza bloki akcji; logikę (Jeśli, Przełącz,
+Powtórz, Dopóki, Czekaj, Przerwij, Zatrzymaj) daje sam deck. W polach akcji działają zmienne, np. `{value}`
+z suwaka, `{index}` w pętli albo `{state}` w wyzwalaczu „Zmiana stanu”.

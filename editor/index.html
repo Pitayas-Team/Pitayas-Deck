@@ -16,6 +16,7 @@
     </div>
     <button class="conn-pill" id="connPill" title="Połącz telefon"><span class="m-status-dot" id="connDot"></span><span id="connText">Uruchamianie…</span></button>
     <div class="m-titlebar-actions">
+      <button class="m-btn small store-btn" id="btnStore" title="Sklep z dodatkami"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9h18l-1.6 10.2a2 2 0 0 1-2 1.8H6.6a2 2 0 0 1-2-1.8z"/><path d="M8 9V7a4 4 0 0 1 8 0v2"/></svg>Sklep<span class="store-badge" id="storeBadge" hidden></span></button>
       <button class="m-btn small accent" id="btnConnect">Połącz telefon</button>
       <div class="m-update-pill" id="updatePill" title="Dostępna aktualizacja">Aktualizacja</div>
       <button class="m-win-btn" id="btnSettings" title="Ustawienia" onclick="openSettings('general')"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg><span class="m-dot"></span></button>
@@ -270,6 +271,26 @@
   </div>
 
   <!-- MODAL: WYBÓR AKCJI -->
+  <div class="m-modal-overlay" id="modalStore">
+    <div class="m-modal store-modal">
+      <div class="m-modal-header">
+        <span class="m-modal-title">Sklep z dodatkami</span>
+        <button class="m-modal-close" onclick="PitayaUI.closeModal('modalStore')">✕</button>
+      </div>
+      <div class="store-layout">
+        <aside class="store-side" id="storeCats"></aside>
+        <section class="store-main">
+          <div class="store-top">
+            <input class="m-input" id="storeSearch" placeholder="Szukaj dodatków: Spotify, Discord, światło…">
+            <button class="m-btn small" id="btnStoreUpdateAll" hidden>Aktualizuj wszystko</button>
+          </div>
+          <div class="store-grid" id="storeGrid"></div>
+          <div class="store-detail" id="storeDetail" hidden></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
   <div class="m-modal-overlay" id="modalAction">
     <div class="m-modal wide">
       <div class="m-modal-header">

@@ -12,10 +12,13 @@
     const EMOJIS = ['🎮', '🎙️', '🎧', '🔴', '🎬', '📷', '💡', '🔊', '🔇', '⏯️', '⏭️', '⏮️', '📁', '🏠', '⭐', '❤️', '🔥', '✅', '❌', '⚡', '💬', '🎵', '🌐', '🔒', '☕', '🎉', '👋', '😂', '🐉', '🍓', '🌙', '⚙️'];
     const TYPES = { button: 'Przycisk', slider: 'Suwak', clock: 'Zegar', gauge: 'Wskaźniki', media: 'Odtwarzacz' };
     const PHASES = {
-        press: ['Naciśnięcie', 'Wykonuje się od razu po dotknięciu.'],
-        longPress: ['Przytrzymanie', 'Po przytrzymaniu przez pół sekundy. Gdy są tu akcje, krótkie dotknięcie czeka na puszczenie.'],
-        release: ['Puszczenie', 'Po puszczeniu przycisku — np. „naciśnij i trzymaj, żeby mówić”.'],
+        press: ['Krótkie naciśnięcie', 'Wykonuje się po dotknięciu przycisku.'],
+        longPress: ['Przytrzymanie', 'Po przytrzymaniu przez pół sekundy. Gdy są tu bloki, krótkie naciśnięcie czeka na puszczenie.'],
+        doublePress: ['Podwójne naciśnięcie', 'Dwa szybkie dotknięcia. Krótkie naciśnięcie czeka wtedy chwilę na drugie.'],
+        touchStart: ['Dotknięcie', 'Od razu, gdy palec dotknie przycisku — np. „naciśnij i trzymaj, żeby mówić”.'],
+        release: ['Puszczenie', 'Gdy palec puści przycisk.'],
         change: ['Zmiana wartości', 'Przy każdym ruchu suwaka. W polach akcji wpisz {value}, żeby użyć wartości.'],
+        stateChange: ['Zmiana stanu', 'Gdy przycisk zmieni stan (np. zmienna przełączy go na Wł.). Nazwa stanu: {state}.'],
     };
     // Polskie słowa → angielskie nazwy ikon Lucide (wyszukiwarka)
     const PL = {
@@ -103,6 +106,7 @@
 
     // ───── Wczytanie ─────
     async function load() {
+        if (!lucideData) lucideData = await deck.lucide();
         data = await deck.get();
         if (!data.deck.profiles.some((p) => p.id === profileId)) profileId = data.deck.profiles[0].id;
         if (!data.deck.folders[folderId] || !inProfile(folderId)) folderId = profile().root;
@@ -596,7 +600,7 @@
         renderWidgetPane(b);
         renderPhases(b);
         renderActions();
-        const total = Object.values(b.actions || {}).reduce((a, l) => a + (l || []).length, 0);
+        const total = Object.values(b.actions || {}).reduce((a, l) => a + countBlocks(l), 0);
         $('actionsCount').textContent = total ? `(${total})` : '';
         renderStatePane(b);
     }
@@ -863,53 +867,415 @@
         return Math.max(0, b.states.findIndex((s) => s.id === id));
     }
 
-    // ───── Akcje ─────
-    function renderPhases(b) {
+    // ───── Bloki akcji (jak w Macro Deck 3) ─────
+    // Ścieżka listy: ['press'] albo np. ['press', 2, 'branches', 0, 'blocks']; ścieżka bloku = ścieżka listy + indeks
+    const LOGIC = {
+        if: { name: 'Jeśli / w przeciwnym razie', icon: 'git-branch', color: '#a855f7', desc: 'Wykonaj bloki tylko, gdy warunek jest spełniony' },
+        switch: { name: 'Przełącz', icon: 'split', color: '#8b5cf6', desc: 'Różne bloki dla różnych wartości zmiennej' },
+        repeat: { name: 'Powtórz', icon: 'repeat', color: '#f59e0b', desc: 'Wykonaj bloki kilka razy' },
+        while: { name: 'Dopóki', icon: 'refresh-cw', color: '#f97316', desc: 'Powtarzaj, dopóki warunek jest spełniony' },
+        wait: { name: 'Czekaj', icon: 'hourglass', color: '#06b6d4', desc: 'Odczekaj chwilę przed następnym blokiem' },
+        break: { name: 'Przerwij pętlę', icon: 'corner-down-right', color: '#ef4444', desc: 'Wyjdź z Powtórz / Dopóki' },
+        stop: { name: 'Zatrzymaj', icon: 'octagon-x', color: '#dc2626', desc: 'Nie wykonuj już kolejnych bloków' },
+    };
+    const PLUGIN_LOOK = { deck: ['#e6007e', 'layout-grid'], system: ['#64748b', 'monitor'], media: ['#22c55e', 'volume-2'], sound: ['#f97316', 'speaker'], http: ['#0ea5e9', 'globe'] };
+    const OPS = [['is', 'jest'], ['isNot', 'nie jest'], ['gt', '>'], ['gte', '≥'], ['lt', '<'], ['lte', '≤'], ['contains', 'zawiera'], ['startsWith', 'zaczyna się od'], ['isOn', 'jest włączone'], ['isOff', 'jest wyłączone'], ['isEmpty', 'jest puste'], ['isNotEmpty', 'nie jest puste'], ['isAvailable', 'istnieje'], ['isNotAvailable', 'nie istnieje']];
+    const UNARY = new Set(['isOn', 'isOff', 'isEmpty', 'isNotEmpty', 'isAvailable', 'isNotAvailable']);
+    let blockClip = null;       // wycięty / skopiowany blok
+    let pickTarget = null;      // { list: ścieżka, index }
+    const collapsed = new Set();
+    const lucideSvg = (name) => (lucideData && lucideData.icons[name] ? R.lucide(lucideData.icons[name]) : '');
+
+    function triggersFor(b) {
         const type = b.type || 'button';
-        const list = type === 'slider' ? ((b.slider || {}).preset === 'custom' ? ['change'] : []) : type === 'media' ? [] : ['press', 'longPress', 'release'];
-        if (!list.includes(phase)) phase = list[0] || 'press';
-        $('phase').innerHTML = list.map((p) => `<button data-v="${p}" class="${p === phase ? 'active' : ''}">${PHASES[p][0]}</button>`).join('');
-        $('phase').hidden = list.length < 2;
-        $('btnAddAction').hidden = !list.length;
-        if (!list.length) $('phaseHint').textContent = type === 'media' ? 'Odtwarzacz ma wbudowane przyciski: poprzedni, graj/pauza, następny.' : 'Ten suwak steruje głośnością bez dodatkowych akcji. Wybierz „Własną zmienną i akcjami” w zakładce Widżet, żeby dodać akcje.';
+        if (type === 'slider') return (b.slider || {}).preset === 'custom' ? ['change'] : [];
+        if (type === 'media') return [];
+        const list = ['press', 'longPress', 'doublePress', 'touchStart', 'release'];
+        if (Array.isArray(b.states) && b.states.length || b.stateVar) list.push('stateChange');
+        return list;
+    }
+    function countBlocks(list) {
+        let n = 0;
+        for (const x of list || []) {
+            if (!x) continue;
+            n++;
+            for (const k of ['blocks', 'else', 'otherwise']) if (Array.isArray(x[k])) n += countBlocks(x[k]);
+            for (const br of x.branches || []) n += countBlocks(br.blocks);
+            for (const cs of x.cases || []) n += countBlocks(cs.blocks);
+        }
+        return n;
+    }
+    function resolve(root, path, create) {
+        let cur = root;
+        for (let i = 0; i < path.length; i++) {
+            const k = path[i];
+            if (cur[k] === undefined || cur[k] === null) { if (!create) return undefined; cur[k] = typeof path[i + 1] === 'number' || i === path.length - 1 ? [] : {}; }
+            cur = cur[k];
+        }
+        return cur;
+    }
+    const P = (str) => JSON.parse(str);
+    const S = (arr) => esc(JSON.stringify(arr));
+
+    function renderPhases(b) {
+        const list = triggersFor(b);
+        const acts = b.actions || {};
+        if (!list.includes(phase)) phase = list.find((t) => (acts[t] || []).length) || list[0] || 'press';
+        // Jak w Macro Deck: widać wyzwalacze, które mają bloki, i ten, który edytujesz; resztę dodaje się z menu
+        const shown = list.filter((t) => t === phase || (acts[t] || []).length || t === list[0]);
+        const more = list.filter((t) => !shown.includes(t));
+        $('phase').className = 'trigger-row';
+        $('phase').innerHTML = shown.map((t) => `<button data-v="${t}" class="trig${t === phase ? ' active' : ''}">${esc(PHASES[t][0])}${(acts[t] || []).length ? `<span class="n">${countBlocks(acts[t])}</span>` : ''}</button>`).join('') +
+            (more.length ? `<div class="trig-add"><button class="trig plus" data-trig-menu title="Dodaj wyzwalacz">＋ Wyzwalacz</button><div class="trig-menu" hidden>${more.map((t) => `<button data-v="${t}"><b>${esc(PHASES[t][0])}</b><small>${esc(PHASES[t][1])}</small></button>`).join('')}</div></div>` : '') +
+            `<button class="trig wide-btn" data-wide title="Większy edytor">${lucideSvg(document.body.classList.contains('wide-actions') ? 'minimize-2' : 'maximize-2')}</button>`;
+        $('phase').hidden = !list.length;
+        $('btnAddAction').hidden = true;
+        if (!list.length) $('phaseHint').textContent = (b.type === 'media') ? 'Odtwarzacz ma wbudowane przyciski: poprzedni, graj/pauza, następny.' : 'Ten suwak steruje głośnością bez dodatkowych bloków. Wybierz „Własną zmienną i akcjami” w zakładce Widżet, żeby dodać bloki.';
     }
     $('phase').onclick = (e) => {
+        if (e.target.closest('[data-wide]')) { document.body.classList.toggle('wide-actions'); renderPhases(rawButton()); setTimeout(renderGrid, 220); return; }
+        if (e.target.closest('[data-trig-menu]')) { const m = $('phase').querySelector('.trig-menu'); m.hidden = !m.hidden; return; }
         const b = e.target.closest('[data-v]');
         if (!b) return;
         phase = b.dataset.v;
-        $('phase').querySelectorAll('button').forEach((x) => x.classList.toggle('active', x === b));
+        renderPhases(rawButton());
         renderActions();
     };
     function renderActions() {
         const b = rawButton() || {};
-        if ($('btnAddAction').hidden) { $('actionsList').innerHTML = ''; return; }
+        if ($('phase').hidden) { $('actionsList').innerHTML = ''; return; }
         $('phaseHint').textContent = PHASES[phase][1];
         const list = (b.actions || {})[phase] || [];
-        $('actionsList').innerHTML = list.length ? list.map((item, i) => actionCard(item, i)).join('') : '<div class="m-small">Brak akcji. Dodaj pierwszą poniżej.</div>';
-        list.forEach((item, i) => wireAction(item, i));
+        $('actionsList').className = 'blocks-root';
+        $('actionsList').innerHTML = blockList(list, [phase], true) +
+            (blockClip ? `<div class="clip-bar">${lucideSvg('clipboard')} W schowku: <b>${esc(blockTitle(blockClip))}</b><button class="m-btn small" data-paste-into='${S([phase])}'>Wklej na końcu</button><button class="tool" data-clip-clear title="Wyczyść schowek">✕</button></div>` : '');
+        wireBlocks($('actionsList'));
     }
-    function actionCard(item, i) {
-        const p = plugin(item.plugin);
-        const a = actionDef(item);
-        const fields = (a && a.fields) || [];
-        return `<div class="act${item.enabled === false ? ' off' : ''}" data-i="${i}">
-            <div class="act-head" data-toggle>
-              <span class="act-num">${i + 1}</span>
-              <span class="act-name">${esc(a ? a.name : item.action)} <small>· ${esc(p ? p.name : item.plugin)}</small></span>
-              <div class="act-tools">
-                <button class="tool" data-op="up" title="W górę">↑</button>
-                <button class="tool" data-op="down" title="W dół">↓</button>
-                <button class="tool" data-op="toggle" title="${item.enabled === false ? 'Włącz' : 'Wyłącz'}">${item.enabled === false ? '○' : '●'}</button>
-                <button class="tool" data-op="remove" title="Usuń">✕</button>
-              </div>
+    function blockTitle(x) {
+        const kind = x.kind || 'action';
+        if (kind !== 'action') return LOGIC[kind] ? LOGIC[kind].name : kind;
+        const a = actionDef(x);
+        return a ? a.name : x.action;
+    }
+    function blockList(list, path, root) {
+        const items = (list || []).map((x, i) => dropZone(path, i) + blockHtml(x, [...path, i])).join('');
+        return `<div class="blist${root ? ' root' : ''}" data-list='${S(path)}'>${items}${dropZone(path, (list || []).length)}
+            <button class="add-block" data-add-into='${S(path)}' data-index="${(list || []).length}">${lucideSvg('plus')} ${root && !(list || []).length ? 'Dodaj pierwszy blok' : 'Dodaj blok'}</button></div>`;
+    }
+    const dropZone = (path, i) => `<div class="drop-zone" data-drop='${S(path)}' data-index="${i}"></div>`;
+    function lookOf(x) {
+        const kind = x.kind || 'action';
+        if (kind !== 'action') return [LOGIC[kind].color, LOGIC[kind].icon];
+        const pl = plugin(x.plugin);
+        return [(pl && pl.color) || (PLUGIN_LOOK[x.plugin] || [])[0] || '#64748b', (pl && pl.icon) || (PLUGIN_LOOK[x.plugin] || [])[1] || 'puzzle'];
+    }
+    function blockHtml(x, path) {
+        const kind = x.kind || 'action';
+        const [color, icon] = lookOf(x);
+        const key = JSON.stringify(path);
+        const isCollapsed = collapsed.has(key);
+        const pl = kind === 'action' ? plugin(x.plugin) : null;
+        const a = kind === 'action' ? actionDef(x) : null;
+        const sub = kind === 'action' ? (pl ? pl.name : x.plugin) : 'Logika';
+        let summary = '';
+        if (kind === 'wait') summary = `${(Number(x.ms) || 0) >= 1000 ? `${(Number(x.ms) / 1000).toLocaleString('pl')} s` : `${Number(x.ms) || 0} ms`}`;
+        if (kind === 'repeat') summary = `${x.times ?? 1}×`;
+        let body = '';
+        if (kind === 'action') {
+            const fields = (a && a.fields) || [];
+            body = `${!pl ? `<div class="act-err">Brak dodatku „${esc(x.plugin)}”. <button class="m-btn small" data-open-store="${esc(x.plugin)}">Zainstaluj ze sklepu</button></div>` : !a ? '<div class="act-err">Dodatek nie ma już tej akcji.</div>' : ''}
+                ${a && a.description ? `<div class="m-small">${esc(a.description)}</div>` : ''}
+                ${fields.map((f) => fieldHtml(f, (x.config || {})[f.key])).join('') || (a ? '<div class="m-small">Ta akcja nie ma ustawień.</div>' : '')}`;
+        } else if (kind === 'wait') {
+            body = `<div class="wait-row"><input class="m-input" type="number" min="0" step="100" data-bkey="ms" value="${esc(x.ms ?? 1000)}"><span>ms</span>
+                ${[250, 500, 1000, 3000].map((v) => `<button class="chip" data-set-ms="${v}">${v >= 1000 ? v / 1000 + ' s' : v + ' ms'}</button>`).join('')}</div>`;
+        } else if (kind === 'repeat') {
+            body = `<div class="wait-row"><input class="m-input" type="number" min="0" max="1000" data-bkey="times" value="${esc(x.times ?? 3)}"><span>razy · numer powtórzenia: <code>{index}</code></span></div>
+                <div class="branch"><div class="branch-head">Wykonuj</div>${blockList(x.blocks, [...path, 'blocks'])}</div>`;
+        } else if (kind === 'while') {
+            body = `${condHtml(x.cond, [...path, 'cond'])}<div class="branch"><div class="branch-head">Wykonuj</div>${blockList(x.blocks, [...path, 'blocks'])}</div>
+                <div class="m-small">Najwyżej 1000 powtórzeń. Numer powtórzenia: <code>{index}</code></div>`;
+        } else if (kind === 'if') {
+            body = (x.branches || []).map((br, i) => `<div class="branch">
+                    <div class="branch-head">${i === 0 ? 'Jeśli' : 'W przeciwnym razie, jeśli'}${i > 0 ? `<button class="tool" data-del-branch='${S([...path, 'branches', i])}' title="Usuń">✕</button>` : ''}</div>
+                    ${condHtml(br.cond, [...path, 'branches', i, 'cond'])}
+                    <div class="branch-head then">to</div>${blockList(br.blocks, [...path, 'branches', i, 'blocks'])}
+                </div>`).join('') +
+                (Array.isArray(x.else) ? `<div class="branch"><div class="branch-head">W przeciwnym razie<button class="tool" data-del-else='${S(path)}' title="Usuń">✕</button></div>${blockList(x.else, [...path, 'else'])}</div>` : '') +
+                `<div class="branch-add"><button class="chip" data-add-branch='${S(path)}'>＋ W przeciwnym razie, jeśli</button>${Array.isArray(x.else) ? '' : `<button class="chip" data-add-else='${S(path)}'>＋ W przeciwnym razie</button>`}</div>`;
+        } else if (kind === 'switch') {
+            body = `<div class="m-field"><label class="m-label">Wartość do sprawdzenia</label><div class="field-row"><input class="m-input" data-bkey="subject" value="${esc(x.subject || '')}" placeholder="{spotify.repeat}"><button class="m-btn small icon-only" data-insert-var="subject" title="Wstaw zmienną">{ }</button></div></div>` +
+                (x.cases || []).map((cs, i) => `<div class="branch"><div class="branch-head">Gdy równa się <input class="m-input mini-in" data-case-value='${S([...path, 'cases', i])}' value="${esc(cs.value ?? '')}" placeholder="wartość"><button class="tool" data-del-case='${S([...path, 'cases', i])}' title="Usuń">✕</button></div>${blockList(cs.blocks, [...path, 'cases', i, 'blocks'])}</div>`).join('') +
+                (Array.isArray(x.otherwise) ? `<div class="branch"><div class="branch-head">W pozostałych przypadkach<button class="tool" data-del-otherwise='${S(path)}' title="Usuń">✕</button></div>${blockList(x.otherwise, [...path, 'otherwise'])}</div>` : '') +
+                `<div class="branch-add"><button class="chip" data-add-case='${S(path)}'>＋ Przypadek</button>${Array.isArray(x.otherwise) ? '' : `<button class="chip" data-add-otherwise='${S(path)}'>＋ W pozostałych przypadkach</button>`}</div>`;
+        } else if (kind === 'break') body = '<div class="m-small">Kończy najbliższą pętlę Powtórz / Dopóki.</div>';
+        else if (kind === 'stop') body = '<div class="m-small">Kolejne bloki tego wyzwalacza nie wykonają się.</div>';
+        return `<div class="block${x.enabled === false ? ' off' : ''}${isCollapsed ? ' collapsed' : ''} k-${kind}" data-path='${S(path)}' style="--bc:${esc(color)}">
+            <div class="block-head" draggable="true">
+              <span class="b-grip" title="Przeciągnij">${lucideSvg('grip-vertical')}</span>
+              <span class="b-ico">${lucideSvg(icon)}</span>
+              <span class="b-title">${esc(blockTitle(x))}${summary ? ` <em>${esc(summary)}</em>` : ''}<small>${esc(sub)}${x.enabled === false ? ' · wyłączony' : ''}</small></span>
+              <button class="tool" data-bop="menu" title="Więcej">${lucideSvg('ellipsis')}</button>
+              <button class="tool" data-bop="collapse" title="${isCollapsed ? 'Rozwiń' : 'Zwiń'}">${lucideSvg(isCollapsed ? 'chevron-down' : 'chevron-up')}</button>
             </div>
-            <div class="act-body">
-              ${!p ? '<div class="act-err">Brak tej wtyczki — zainstaluj ją albo usuń akcję.</div>' : !a ? '<div class="act-err">Wtyczka nie ma już tej akcji.</div>' : ''}
-              ${a && a.description ? `<div class="m-small">${esc(a.description)}</div>` : ''}
-              ${fields.map((f) => fieldHtml(f, (item.config || {})[f.key])).join('') || (a ? '<div class="m-small">Ta akcja nie ma ustawień.</div>' : '')}
-            </div>
+            ${x.comment !== undefined ? `<div class="b-comment"><textarea class="m-input" data-bkey="comment" rows="1" placeholder="Komentarz…">${esc(x.comment)}</textarea></div>` : ''}
+            <div class="block-body">${body}</div>
         </div>`;
     }
+    function condHtml(cond, path) {
+        const c = cond || { join: 'and', rules: [] };
+        const rules = c.rules || [];
+        return `<div class="cond" data-cond='${S(path)}'>
+            ${rules.map((r, i) => `<div class="cond-rule" data-rule="${i}">
+                ${i ? `<button class="join" data-join title="Zmień i / lub">${c.join === 'or' ? 'lub' : 'i'}</button>` : '<span class="join ghost"></span>'}
+                <button class="m-btn small var-btn" data-rule-var="${i}">${r.left ? `{${esc(r.left)}}` : 'zmienna…'}</button>
+                <select class="m-select" data-rule-op="${i}">${OPS.map(([v, l]) => `<option value="${v}" ${v === (r.op || 'is') ? 'selected' : ''}>${l}</option>`).join('')}</select>
+                ${UNARY.has(r.op) ? '' : `<input class="m-input" data-rule-right="${i}" value="${esc(r.right ?? '')}" placeholder="wartość">`}
+                <button class="tool" data-rule-del="${i}" title="Usuń warunek">✕</button>
+            </div>`).join('') || '<div class="m-small">Brak warunku — zawsze spełniony.</div>'}
+            <button class="chip" data-rule-add>＋ Warunek</button>
+        </div>`;
+    }
+
+    // Zmiany w blokach
+    function mutate(fn, rerender = true) {
+        update((x) => { x.actions = x.actions || {}; x.actions[phase] = x.actions[phase] || []; fn(x.actions); }, { rerender });
+    }
+    function blockAt(actions, path) { return resolve(actions, path); }
+    function listOf(actions, blockPath) { return resolve(actions, blockPath.slice(0, -1), true); }
+    function newBlock(kind) {
+        if (kind === 'if') return { kind, branches: [{ cond: { join: 'and', rules: [{ left: '', op: 'isOn', right: '' }] }, blocks: [] }] };
+        if (kind === 'switch') return { kind, subject: '', cases: [{ value: '', blocks: [] }], otherwise: [] };
+        if (kind === 'repeat') return { kind, times: 3, blocks: [] };
+        if (kind === 'while') return { kind, cond: { join: 'and', rules: [{ left: '', op: 'isOn', right: '' }] }, blocks: [] };
+        if (kind === 'wait') return { kind, ms: 1000 };
+        return { kind };
+    }
+    // Zmiana ścieżek po wstawieniu/usunięciu — przy przenoszeniu najpierw wyjmujemy, potem wstawiamy
+    function moveBlock(fromPath, toList, toIndex) {
+        mutate((acts) => {
+            const src = listOf(acts, fromPath);
+            const i = fromPath[fromPath.length - 1];
+            const [item] = src.splice(i, 1);
+            // Jeśli lista docelowa leży za źródłem w tej samej liście, indeksy się przesunęły
+            const sameList = JSON.stringify(fromPath.slice(0, -1)) === JSON.stringify(toList);
+            let idx = toIndex;
+            if (sameList && i < toIndex) idx--;
+            // Gdy cel był wewnątrz przenoszonego bloku albo za nim w tej samej liście nadrzędnej, poprawiamy ścieżkę
+            const fixed = toList.slice();
+            const parent = fromPath.slice(0, -1);
+            if (fixed.length > parent.length && JSON.stringify(fixed.slice(0, parent.length)) === JSON.stringify(parent) && typeof fixed[parent.length] === 'number' && fixed[parent.length] > i) fixed[parent.length]--;
+            resolve(acts, fixed, true).splice(idx, 0, item);
+        });
+    }
+
+    function blockMenu(btn, path) {
+        document.querySelectorAll('.block-menu').forEach((m) => m.remove());
+        const x = blockAt(rawButton().actions, path);
+        const menu = document.createElement('div');
+        menu.className = 'block-menu';
+        menu.innerHTML = [
+            ['toggle', x.enabled === false ? 'Włącz blok' : 'Wyłącz blok', x.enabled === false ? 'eye' : 'eye-off'],
+            ['comment', x.comment !== undefined ? 'Usuń komentarz' : 'Dodaj komentarz', 'message-square'],
+            ['duplicate', 'Duplikuj', 'copy'],
+            ['copy', 'Kopiuj', 'clipboard-copy'],
+            ['cut', 'Wytnij', 'scissors'],
+            blockClip ? ['paste', 'Wklej pod spodem', 'clipboard-paste'] : null,
+            ['up', 'W górę', 'arrow-up'],
+            ['down', 'W dół', 'arrow-down'],
+            ['run', 'Uruchom ten blok', 'play'],
+            ['delete', 'Usuń', 'trash-2'],
+        ].filter(Boolean).map(([op, label, icon]) => `<button data-mop="${op}" class="${op === 'delete' ? 'danger' : ''}">${lucideSvg(icon)}${label}</button>`).join('');
+        document.body.appendChild(menu);
+        const r = btn.getBoundingClientRect();
+        menu.style.left = `${Math.min(r.right - 200, innerWidth - 210)}px`;
+        menu.style.top = `${Math.min(r.bottom + 4, innerHeight - menu.offsetHeight - 8)}px`;
+        menu.onclick = async (e) => {
+            const op = e.target.closest('[data-mop]') && e.target.closest('[data-mop]').dataset.mop;
+            if (!op) return;
+            menu.remove();
+            const i = path[path.length - 1];
+            if (op === 'run') { await flushSave(); const res = await deck.testActions([clone(x)]); toast(res.ok ? 'Wykonano' : res.errors.join(' · '), res.ok ? 'success' : 'error'); return; }
+            if (op === 'copy') { blockClip = clone(x); toast('Skopiowano blok'); return renderActions(); }
+            mutate((acts) => {
+                const list = listOf(acts, path);
+                const b = list[i];
+                if (op === 'toggle') b.enabled = b.enabled === false;
+                if (op === 'comment') { if (b.comment !== undefined) delete b.comment; else b.comment = ''; }
+                if (op === 'duplicate') list.splice(i + 1, 0, clone(b));
+                if (op === 'cut') { blockClip = clone(b); list.splice(i, 1); }
+                if (op === 'paste' && blockClip) list.splice(i + 1, 0, clone(blockClip));
+                if (op === 'up' && i > 0) [list[i - 1], list[i]] = [list[i], list[i - 1]];
+                if (op === 'down' && i < list.length - 1) [list[i + 1], list[i]] = [list[i], list[i + 1]];
+                if (op === 'delete') list.splice(i, 1);
+            });
+        };
+        setTimeout(() => addEventListener('click', function close(ev) { if (!menu.contains(ev.target)) { menu.remove(); removeEventListener('click', close, true); } }, true), 0);
+    }
+
+    let dragPath = null;
+    function wireBlocks(root) {
+        root.onclick = (e) => {
+            const t = e.target;
+            const blockEl = t.closest('.block');
+            const path = blockEl ? P(blockEl.dataset.path) : null;
+            const q = (sel) => t.closest(sel);
+            if (q('[data-bop="menu"]')) return blockMenu(q('[data-bop="menu"]'), path);
+            if (q('[data-bop="collapse"]') || (q('.b-title') && !q('input'))) {
+                const k = JSON.stringify(path);
+                if (collapsed.has(k)) collapsed.delete(k); else collapsed.add(k);
+                return renderActions();
+            }
+            if (q('[data-add-into]')) { const b = q('[data-add-into]'); return openBlockPicker(P(b.dataset.addInto), Number(b.dataset.index)); }
+            if (q('[data-paste-into]')) { const pth = P(q('[data-paste-into]').dataset.pasteInto); return mutate((acts) => { resolve(acts, pth, true).push(clone(blockClip)); }); }
+            if (q('[data-clip-clear]')) { blockClip = null; return renderActions(); }
+            if (q('[data-open-store]')) return openStore(q('[data-open-store]').dataset.openStore);
+            if (q('[data-set-ms]')) return mutate((acts) => { blockAt(acts, path).ms = Number(q('[data-set-ms]').dataset.setMs); });
+            if (q('[data-add-branch]')) return mutate((acts) => { blockAt(acts, path).branches.push({ cond: { join: 'and', rules: [{ left: '', op: 'isOn', right: '' }] }, blocks: [] }); });
+            if (q('[data-add-else]')) return mutate((acts) => { blockAt(acts, path).else = []; });
+            if (q('[data-del-else]')) return mutate((acts) => { delete blockAt(acts, path).else; });
+            if (q('[data-del-branch]')) { const bp = P(q('[data-del-branch]').dataset.delBranch); return mutate((acts) => { resolve(acts, bp.slice(0, -1)).splice(bp[bp.length - 1], 1); }); }
+            if (q('[data-add-case]')) return mutate((acts) => { blockAt(acts, path).cases.push({ value: '', blocks: [] }); });
+            if (q('[data-add-otherwise]')) return mutate((acts) => { blockAt(acts, path).otherwise = []; });
+            if (q('[data-del-otherwise]')) return mutate((acts) => { delete blockAt(acts, path).otherwise; });
+            if (q('[data-del-case]')) { const cp = P(q('[data-del-case]').dataset.delCase); return mutate((acts) => { resolve(acts, cp.slice(0, -1)).splice(cp[cp.length - 1], 1); }); }
+            if (q('[data-insert-var]')) { const k = q('[data-insert-var]').dataset.insertVar; return pickVariable((name) => mutate((acts) => { const b = blockAt(acts, path); b[k] = `${b[k] || ''}{${name}}`; })); }
+            // Warunki
+            const condEl = t.closest('[data-cond]');
+            if (condEl) {
+                const cp = P(condEl.dataset.cond);
+                const getCond = (acts) => { const parent = resolve(acts, cp.slice(0, -1)); const k = cp[cp.length - 1]; parent[k] = parent[k] || { join: 'and', rules: [] }; return parent[k]; };
+                if (q('[data-rule-add]')) return mutate((acts) => { getCond(acts).rules.push({ left: '', op: 'isOn', right: '' }); });
+                if (q('[data-rule-del]')) return mutate((acts) => { getCond(acts).rules.splice(Number(q('[data-rule-del]').dataset.ruleDel), 1); });
+                if (q('[data-join]')) return mutate((acts) => { const c = getCond(acts); c.join = c.join === 'or' ? 'and' : 'or'; });
+                if (q('[data-rule-var]')) { const i = Number(q('[data-rule-var]').dataset.ruleVar); return pickVariable((name) => mutate((acts) => { getCond(acts).rules[i].left = name; })); }
+            }
+        };
+        root.onchange = (e) => {
+            const t = e.target;
+            const condEl = t.closest('[data-cond]');
+            if (condEl && t.dataset.ruleOp !== undefined) {
+                const cp = P(condEl.dataset.cond);
+                return mutate((acts) => { resolve(acts, cp).rules[Number(t.dataset.ruleOp)].op = t.value; });
+            }
+        };
+        root.oninput = (e) => {
+            const t = e.target;
+            const blockEl = t.closest('.block');
+            if (!blockEl) return;
+            const path = P(blockEl.dataset.path);
+            const condEl = t.closest('[data-cond]');
+            if (condEl && t.dataset.ruleRight !== undefined) { const cp = P(condEl.dataset.cond); return mutate((acts) => { resolve(acts, cp).rules[Number(t.dataset.ruleRight)].right = t.value; }, false); }
+            if (t.dataset.caseValue) { const cp = P(t.dataset.caseValue); return mutate((acts) => { resolve(acts, cp).value = t.value; }, false); }
+            if (t.dataset.bkey) {
+                const k = t.dataset.bkey;
+                return mutate((acts) => { blockAt(acts, path)[k] = t.type === 'number' ? (t.value === '' ? '' : Number(t.value)) : t.value; }, false);
+            }
+        };
+        // Pola akcji (te same co wcześniej: listy, pliki, skróty)
+        root.querySelectorAll('.block.k-action').forEach((blockEl) => {
+            const path = P(blockEl.dataset.path);
+            const x = blockAt(rawButton().actions, path);
+            const own = (el) => el.closest('.block') === blockEl;
+            const setCfg = (key, value) => mutate((acts) => { const b = blockAt(acts, path); b.config = { ...(b.config || {}), [key]: value }; }, false);
+            blockEl.querySelectorAll('.block-body [data-key]').forEach((input) => {
+                if (!own(input)) return;
+                const key = input.dataset.key, type = input.dataset.type;
+                const read = () => (type === 'bool' ? input.checked : type === 'number' ? (input.value === '' ? '' : Number(input.value)) : input.value);
+                input.addEventListener(type === 'bool' || input.tagName === 'SELECT' ? 'change' : 'input', (ev) => { ev.stopPropagation(); setCfg(key, read()); });
+                if (input.dataset.dynamic) loadOptions(x, key, input);
+            });
+            blockEl.querySelectorAll('[data-refresh]').forEach((b) => own(b) && b.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                const sel = b.parentElement.querySelector('select');
+                delete optionsCache[`${x.plugin}/${x.action}/${sel.dataset.key}`];
+                loadOptions(x, sel.dataset.key, sel);
+            }));
+            blockEl.querySelectorAll('[data-browse]').forEach((b) => own(b) && b.addEventListener('click', async (ev) => {
+                ev.stopPropagation();
+                const input = b.parentElement.querySelector('input');
+                const a = actionDef(x);
+                const f = a && a.fields.find((y) => y.key === input.dataset.key);
+                const file = await deck.pickFile({ filters: f && f.filters });
+                if (file) { input.value = file; setCfg(input.dataset.key, file); }
+            }));
+            blockEl.querySelectorAll('[data-record]').forEach((b) => own(b) && b.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                const input = b.parentElement.querySelector('input');
+                recordHotkey(input, (v) => setCfg(input.dataset.key, v));
+            }));
+        });
+        // Przeciąganie bloków między miejscami (także do środka Jeśli / Powtórz)
+        root.querySelectorAll('.block-head').forEach((h) => {
+            h.addEventListener('dragstart', (e) => { dragPath = P(h.closest('.block').dataset.path); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', 'block'); root.classList.add('dragging'); });
+            h.addEventListener('dragend', () => { dragPath = null; root.classList.remove('dragging'); root.querySelectorAll('.drop-zone.over').forEach((z) => z.classList.remove('over')); });
+        });
+        root.querySelectorAll('.drop-zone').forEach((z) => {
+            z.addEventListener('dragover', (e) => { if (!dragPath) return; e.preventDefault(); z.classList.add('over'); });
+            z.addEventListener('dragleave', () => z.classList.remove('over'));
+            z.addEventListener('drop', (e) => {
+                e.preventDefault();
+                z.classList.remove('over');
+                if (!dragPath) return;
+                const to = P(z.dataset.drop);
+                // Nie można wrzucić bloku do jego własnego wnętrza
+                const from = JSON.stringify(dragPath);
+                if (JSON.stringify(to.slice(0, dragPath.length)) === from) return toast('Nie można przenieść bloku do jego wnętrza', 'error');
+                moveBlock(dragPath, to, Number(z.dataset.index));
+                dragPath = null;
+            });
+        });
+    }
+
+    // Wybór nowego bloku: logika + akcje z dodatków
+    function openBlockPicker(listPath, index) {
+        pickTarget = { list: listPath, index };
+        $('actionSearch').value = '';
+        renderPicker();
+        PitayaUI.openModal('modalAction');
+        setTimeout(() => $('actionSearch').focus(), 50);
+    }
+    function renderPicker() {
+        const q = $('actionSearch').value.trim().toLowerCase();
+        const inLoop = pickTarget && pickTarget.list.some((k) => k === 'blocks');
+        const logic = Object.entries(LOGIC).filter(([k, l]) => (k !== 'break' || inLoop) && (!q || `${l.name} ${l.desc} logika warunek pętla`.toLowerCase().includes(q)));
+        const groups = data.plugins.filter((p) => !p.error && !p.disabled && p.actions.length).map((p) => {
+            const items = p.actions.filter((a) => !q || `${a.name} ${a.description} ${p.name} ${a.id} ${p.id}`.toLowerCase().includes(q));
+            if (!items.length) return '';
+            const look = [(p.color) || (PLUGIN_LOOK[p.id] || [])[0] || '#64748b', p.icon || (PLUGIN_LOOK[p.id] || [])[1] || 'puzzle'];
+            return `<div class="ap-group"><div class="ap-head"><span class="b-ico" style="--bc:${esc(look[0])}">${lucideSvg(look[1])}</span>${esc(p.name)}</div>${items.map((a) =>
+                `<button class="ap-item" data-p="${esc(p.id)}" data-a="${esc(a.id)}">${esc(a.name)}${a.description ? `<small>${esc(a.description)}</small>` : ''}</button>`).join('')}</div>`;
+        });
+        $('actionPicker').innerHTML = (logic.length ? `<div class="ap-group logic"><div class="ap-head"><span class="b-ico" style="--bc:#a855f7">${lucideSvg('workflow')}</span>Logika</div>${logic.map(([k, l]) =>
+            `<button class="ap-item" data-logic="${k}"><span class="ap-li" style="--bc:${l.color}">${lucideSvg(l.icon)}</span>${esc(l.name)}<small>${esc(l.desc)}</small></button>`).join('')}</div>` : '') +
+            groups.join('') +
+            `<div class="ap-group store-more"><div class="ap-head"><span class="b-ico" style="--bc:#e6007e">${lucideSvg('shopping-bag')}</span>Więcej akcji</div><button class="ap-item" data-store-more>Otwórz sklep z dodatkami<small>Spotify, Discord, OBS, Home Assistant, Minutnik…</small></button></div>`;
+    }
+    $('btnAddAction').onclick = () => openBlockPicker([phase], ((rawButton().actions || {})[phase] || []).length);
+    $('actionSearch').oninput = renderPicker;
+    $('actionPicker').onclick = (e) => {
+        if (e.target.closest('[data-store-more]')) { PitayaUI.closeModal('modalAction'); return openStore(); }
+        const lb = e.target.closest('[data-logic]');
+        const b = e.target.closest('[data-a]');
+        if (!lb && !b) return;
+        let block;
+        if (lb) block = newBlock(lb.dataset.logic);
+        else {
+            const def = plugin(b.dataset.p).actions.find((a) => a.id === b.dataset.a);
+            const config = {};
+            for (const f of def.fields) if (f.default !== undefined) config[f.key] = f.default;
+            block = { plugin: b.dataset.p, action: b.dataset.a, config };
+        }
+        const target = pickTarget || { list: [phase], index: ((rawButton().actions || {})[phase] || []).length };
+        update((x) => {
+            x.actions = x.actions || {};
+            resolve(x.actions, target.list, true).splice(target.index, 0, block);
+            if (!lb && (x.type || 'button') === 'button' && !x.label) x.label = plugin(b.dataset.p).actions.find((a) => a.id === b.dataset.a).name;
+        }, { rerender: true });
+        PitayaUI.closeModal('modalAction');
+        switchTab('actions');
+    };
+
     function fieldHtml(f, value) {
         const v = value === undefined ? f.default : value;
         const id = `f_${Math.random().toString(36).slice(2, 9)}`;
@@ -933,43 +1299,6 @@
             <button class="m-btn small" data-browse>Wybierz…</button></div>${help}</div>`;
         if (f.type === 'password') return `<div class="m-field">${label}<input class="m-input" type="password" ${attrs} value="${esc(v ?? '')}">${help}</div>`;
         return `<div class="m-field">${label}<input class="m-input" ${f.type === 'number' ? 'type="number"' : ''} ${attrs} value="${esc(v ?? '')}" placeholder="${esc(f.placeholder || '')}">${help}</div>`;
-    }
-    function setConfig(i, key, value) {
-        update((x) => {
-            const item = x.actions[phase][i];
-            item.config = { ...(item.config || {}), [key]: value };
-        });
-    }
-    function wireAction(item, i) {
-        const box = $('actionsList').querySelector(`[data-i="${i}"]`);
-        box.querySelector('[data-toggle]').addEventListener('click', (e) => {
-            const op = e.target.dataset.op;
-            if (op) return actionOp(i, op);
-            box.classList.toggle('collapsed');
-        });
-        box.querySelectorAll('[data-key]').forEach((input) => {
-            const key = input.dataset.key;
-            const type = input.dataset.type;
-            const read = () => (type === 'bool' ? input.checked : type === 'number' ? (input.value === '' ? '' : Number(input.value)) : input.value);
-            input.addEventListener(type === 'bool' || input.tagName === 'SELECT' ? 'change' : 'input', () => setConfig(i, key, read()));
-            if (input.dataset.dynamic) loadOptions(item, key, input);
-        });
-        box.querySelectorAll('[data-refresh]').forEach((b) => b.addEventListener('click', () => {
-            const sel = b.parentElement.querySelector('select');
-            delete optionsCache[`${item.plugin}/${item.action}/${sel.dataset.key}`];
-            loadOptions(item, sel.dataset.key, sel);
-        }));
-        box.querySelectorAll('[data-browse]').forEach((b) => b.addEventListener('click', async () => {
-            const input = b.parentElement.querySelector('input');
-            const a = actionDef(item);
-            const f = a.fields.find((x) => x.key === input.dataset.key);
-            const file = await deck.pickFile({ filters: f && f.filters });
-            if (file) { input.value = file; setConfig(i, input.dataset.key, file); }
-        }));
-        box.querySelectorAll('[data-record]').forEach((b) => b.addEventListener('click', () => {
-            const input = b.parentElement.querySelector('input');
-            recordHotkey(input, (v) => setConfig(i, input.dataset.key, v));
-        }));
     }
     async function loadOptions(item, key, select) {
         const cacheKey = `${item.plugin}/${item.action}/${key}`;
@@ -1006,43 +1335,6 @@
         };
         addEventListener('keydown', handler, true);
     }
-    function actionOp(i, op) {
-        update((x) => {
-            const list = x.actions[phase];
-            if (op === 'remove') list.splice(i, 1);
-            if (op === 'up' && i > 0) [list[i - 1], list[i]] = [list[i], list[i - 1]];
-            if (op === 'down' && i < list.length - 1) [list[i + 1], list[i]] = [list[i], list[i + 1]];
-            if (op === 'toggle') list[i].enabled = list[i].enabled === false;
-        }, { rerender: true });
-    }
-
-    // Wybór nowej akcji
-    function renderPicker() {
-        const q = $('actionSearch').value.trim().toLowerCase();
-        $('actionPicker').innerHTML = data.plugins.filter((p) => !p.error && !p.disabled).map((p) => {
-            const items = p.actions.filter((a) => !q || `${a.name} ${a.description} ${p.name}`.toLowerCase().includes(q));
-            if (!items.length) return '';
-            return `<div class="ap-group"><div class="m-label">${esc(p.name)}</div>${items.map((a) =>
-                `<button class="ap-item" data-p="${esc(p.id)}" data-a="${esc(a.id)}">${esc(a.name)}${a.description ? `<small>${esc(a.description)}</small>` : ''}</button>`).join('')}</div>`;
-        }).join('') || '<div class="m-small">Nic nie znaleziono.</div>';
-    }
-    $('btnAddAction').onclick = () => { $('actionSearch').value = ''; renderPicker(); PitayaUI.openModal('modalAction'); setTimeout(() => $('actionSearch').focus(), 50); };
-    $('actionSearch').oninput = renderPicker;
-    $('actionPicker').onclick = (e) => {
-        const b = e.target.closest('[data-a]');
-        if (!b) return;
-        const def = plugin(b.dataset.p).actions.find((a) => a.id === b.dataset.a);
-        const config = {};
-        for (const f of def.fields) if (f.default !== undefined) config[f.key] = f.default;
-        update((x) => {
-            x.actions = x.actions || {};
-            (x.actions[phase] = x.actions[phase] || []).push({ plugin: b.dataset.p, action: b.dataset.a, config });
-            if ((x.type || 'button') === 'button' && !x.label) x.label = def.name;
-        }, { rerender: true });
-        PitayaUI.closeModal('modalAction');
-        switchTab('actions');
-    };
-
     // ───── Zmienne: wstawianie i wybór ─────
     let varCallback = null;
     function variableRows(list, clickable) {
@@ -1089,8 +1381,10 @@
         await flushSave();
         const b = rawButton();
         if (b.type === 'slider') { await deck.testSlider(folderId, selected, 50); return toast('Ustawiono suwak na 50'); }
-        const res = await deck.testButton(folderId, selected, 'press');
-        if (!((b.actions || {}).press || []).length && !(b.states && b.stateSource === 'cycle')) return toast('Ten przycisk nie ma akcji naciśnięcia.', 'info');
+        // Na zakładce Akcje „Testuj” uruchamia wyzwalacz, który właśnie edytujesz
+        const trig = activeTab() === 'actions' && phase !== 'change' ? phase : 'press';
+        const res = await deck.testButton(folderId, selected, trig);
+        if (!((b.actions || {})[trig] || []).length && !(trig === 'press' && b.states && b.stateSource === 'cycle')) return toast(`Ten przycisk nie ma bloków dla: ${PHASES[trig][0]}.`, 'info');
         toast(res.ok ? 'Wykonano' : res.errors.join(' · '), res.ok ? 'success' : 'error');
         data = { ...data, ...(await deck.get()) };
         renderGrid();
@@ -1304,6 +1598,145 @@
         }
         if (selected && state.buttons[selected] && lookState === null) paintInspPreview(fixImage(state.buttons[selected]));
     });
+
+    // ───── Sklep z dodatkami ─────
+    let storeData = null;
+    let storeCat = 'all';
+    let storeOpenId = null;
+    const STORE_ICON = (name) => (lucideData && lucideData.icons[name] ? R.lucide(lucideData.icons[name]) : '');
+    const icoBox = (it, big) => `<span class="store-ico${big ? ' big' : ''}" style="background:${esc(it.color || '#e6007e')}">${STORE_ICON(it.icon || 'puzzle')}</span>`;
+    async function openStore(id) {
+        if (!lucideData) lucideData = await deck.lucide();
+        storeOpenId = id || null;
+        PitayaUI.openModal('modalStore');
+        $('storeGrid').innerHTML = '<div class="store-empty">Wczytywanie sklepu…</div>';
+        await refreshStore();
+    }
+    async function refreshStore(force) {
+        storeData = await deck.storeList(force);
+        updateStoreBadge();
+        renderStore();
+    }
+    function updateStoreBadge() {
+        const n = storeData ? storeData.items.filter((x) => x.update).length : 0;
+        $('storeBadge').hidden = !n;
+        $('storeBadge').textContent = n;
+    }
+    function renderStore() {
+        const items = storeData.items;
+        const count = (f) => items.filter(f).length;
+        const cats = [
+            { id: 'all', name: 'Wszystkie', icon: 'layout-grid', n: items.length },
+            { id: 'installed', name: 'Zainstalowane', icon: 'circle-check', n: count((x) => x.installed) },
+            { id: 'updates', name: 'Aktualizacje', icon: 'refresh-cw', n: count((x) => x.update) },
+            null,
+            ...storeData.categories.map((c) => ({ ...c, n: count((x) => x.category === c.id) })).filter((c) => c.n),
+        ];
+        $('storeCats').innerHTML = cats.map((c) => (c ? `<button data-cat="${c.id}" class="${c.id === storeCat ? 'active' : ''}">${STORE_ICON(c.icon)}${esc(c.name)}<span class="n">${c.n}</span></button>` : '<div class="sep"></div>')).join('') +
+            `<div class="store-url"><span>Własny sklep (adres katalogu)</span><input class="m-input" id="storeUrlInput" placeholder="https://…" value="${esc(storeData.storeUrl)}">${storeData.remoteError ? `<span class="t-err">Nie udało się wczytać: ${esc(storeData.remoteError)}</span>` : ''}</div>`;
+        $('storeUrlInput').onchange = async (e) => { storeData = await deck.storeUrl(e.target.value); renderStore(); };
+        $('btnStoreUpdateAll').hidden = !count((x) => x.update);
+        const q = $('storeSearch').value.trim().toLowerCase();
+        const shown = items.filter((x) => (storeCat === 'all' || (storeCat === 'installed' && x.installed) || (storeCat === 'updates' && x.update) || x.category === storeCat) &&
+            (!q || `${x.name} ${x.description} ${(x.tags || []).join(' ')} ${x.author}`.toLowerCase().includes(q)));
+        $('storeGrid').innerHTML = shown.map((it) => `<div class="store-card" data-sid="${esc(it.id)}">
+                <div class="sc-head">${icoBox(it)}<div><div class="sc-name">${esc(it.name)}</div><div class="sc-meta">${esc(it.author || '')} · ${esc(it.version)}</div></div></div>
+                <div class="sc-desc">${esc(it.description)}</div>
+                <div class="sc-foot">${statusPill(it)}${cardButton(it)}</div>
+            </div>`).join('') || '<div class="store-empty">Nic nie znaleziono.</div>';
+        if (storeOpenId) renderStoreDetail(storeOpenId); else $('storeDetail').hidden = true;
+    }
+    function statusPill(it) {
+        if (it.error) return '<span class="pill err">Błąd</span>';
+        if (it.update) return `<span class="pill upd">Nowa wersja ${esc(it.version)}</span>`;
+        if (it.installed) return it.disabled ? '<span class="pill">Wyłączony</span>' : '<span class="pill ok">Zainstalowany</span>';
+        return it.featured ? '<span class="pill feat">Polecany</span>' : '';
+    }
+    function cardButton(it) {
+        if (it.update) return `<button class="m-btn small accent" data-store="install" data-id="${esc(it.id)}">Aktualizuj</button>`;
+        if (it.installed) return `<button class="m-btn small" data-store="open" data-id="${esc(it.id)}">Szczegóły</button>`;
+        return `<button class="m-btn small accent" data-store="install" data-id="${esc(it.id)}">Zainstaluj</button>`;
+    }
+    function renderStoreDetail(id) {
+        const it = storeData.items.find((x) => x.id === id);
+        if (!it) { storeOpenId = null; $('storeDetail').hidden = true; return; }
+        const cat = storeData.categories.find((c) => c.id === it.category);
+        $('storeDetail').hidden = false;
+        $('storeDetail').innerHTML = `
+            <button class="m-btn small sd-back" data-store="back">← Wróć do sklepu</button>
+            <div class="sd-head">${icoBox(it, true)}
+              <div><h2>${esc(it.name)}</h2><div class="sd-sub">${esc(it.author || '')} · wersja ${esc(it.version)}${cat ? ` · ${esc(cat.name)}` : ''}</div>
+                <div class="tags" style="margin-top:8px">${statusPill(it)}${(it.tags || []).map((t) => `<span class="pill">${esc(t)}</span>`).join('')}</div></div>
+              <div class="sd-actions">
+                ${it.installed ? `${it.update ? `<button class="m-btn accent" data-store="install" data-id="${esc(it.id)}">Aktualizuj do ${esc(it.version)}</button>` : ''}
+                    <button class="m-btn" data-store="settings" data-id="${esc(it.id)}">Ustawienia</button>
+                    <button class="m-btn danger" data-store="uninstall" data-id="${esc(it.id)}">Odinstaluj</button>`
+                  : `<button class="m-btn accent" data-store="install" data-id="${esc(it.id)}">Zainstaluj</button>`}
+              </div>
+            </div>
+            <div class="sd-cols">
+              <div>
+                <div class="sd-box"><h4>Opis</h4><p>${esc(it.longDescription || it.description)}</p></div>
+                ${(it.features || []).length ? `<div class="sd-box"><h4>Co dodaje</h4><ul>${it.features.map((f) => `<li>${esc(f)}</li>`).join('')}</ul></div>` : ''}
+                ${it.status ? `<div class="sd-box"><h4>Stan</h4><p class="${it.status.ok ? 't-ok' : ''}">${esc(it.status.text)}</p></div>` : ''}
+                ${it.error ? `<div class="sd-box"><h4>Błąd</h4><p class="t-err">${esc(it.error)}</p></div>` : ''}
+              </div>
+              <div>
+                <div class="sd-box"><h4>Informacje</h4><dl>
+                  <dt>Wersja</dt><dd>${esc(it.version)}${it.installed && it.installedVersion !== it.version ? ` (masz ${esc(it.installedVersion)})` : ''}</dd>
+                  <dt>Autor</dt><dd>${esc(it.author || '—')}</dd>
+                  <dt>Licencja</dt><dd>${esc(it.license || '—')}</dd>
+                  ${it.installed && it.variablesCount !== null ? `<dt>Akcje</dt><dd>${it.actionsCount}</dd><dt>Zmienne</dt><dd>${it.variablesCount}</dd>` : ''}
+                  <dt>Źródło</dt><dd>${it.source === 'remote' ? 'sklep internetowy' : 'w zestawie z Pitaya Deck'}</dd>
+                </dl></div>
+                ${(it.changelog || []).length ? `<div class="sd-box"><h4>Historia zmian</h4>${it.changelog.map((c) => `<div class="sd-log"><b>${esc(c.version)}</b> ${esc(c.notes)}</div>`).join('')}</div>` : ''}
+              </div>
+            </div>`;
+    }
+    async function storeAction(op, id, btn) {
+        if (op === 'back') { storeOpenId = null; $('storeDetail').hidden = true; return; }
+        if (op === 'open') { storeOpenId = id; renderStoreDetail(id); return; }
+        if (op === 'settings') { PitayaUI.closeModal('modalStore'); await openSettings('plugins'); const box = document.querySelector(`.plug[data-plugin="${CSS.escape(id)}"]`); if (box) box.scrollIntoView({ block: 'start' }); return; }
+        if (btn) { btn.disabled = true; btn.textContent = op === 'uninstall' ? 'Usuwanie…' : 'Instalowanie…'; }
+        try {
+            if (op === 'install') {
+                const r = await deck.storeInstall(id);
+                data.plugins = r.plugins;
+                toast(`Zainstalowano: ${r.name} ${r.version}`, 'success');
+                storeOpenId = id;
+            }
+            if (op === 'uninstall') {
+                const used = (await deck.storeUsed()).includes(id);
+                if (!confirm(used ? 'Twoje przyciski używają tego dodatku — po odinstalowaniu ich akcje przestaną działać. Odinstalować?' : 'Odinstalować ten dodatek?')) { renderStore(); return; }
+                const r = await deck.storeUninstall(id);
+                data.plugins = r.plugins;
+                toast('Odinstalowano', 'success');
+            }
+            optionsCache = {};
+            data.variables = await deck.variables();
+        } catch (err) { toast(String(err.message || err).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), 'error'); }
+        await refreshStore();
+        if (selected) renderInspector();
+    }
+    $('storeGrid').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-store]');
+        if (b) { e.stopPropagation(); return storeAction(b.dataset.store, b.dataset.id, b); }
+        const card = e.target.closest('[data-sid]');
+        if (card) storeAction('open', card.dataset.sid);
+    });
+    $('storeDetail').addEventListener('click', (e) => { const b = e.target.closest('[data-store]'); if (b) storeAction(b.dataset.store, b.dataset.id, b); });
+    $('storeCats').addEventListener('click', (e) => { const b = e.target.closest('[data-cat]'); if (!b) return; storeCat = b.dataset.cat; storeOpenId = null; renderStore(); });
+    $('storeSearch').oninput = () => { storeOpenId = null; renderStore(); };
+    $('btnStoreUpdateAll').onclick = async () => {
+        $('btnStoreUpdateAll').disabled = true;
+        try { const r = await deck.storeUpdateAll(); data.plugins = r.plugins; toast(`Zaktualizowano: ${r.updated.join(', ')}`, 'success'); } catch (err) { toast(err.message, 'error'); }
+        $('btnStoreUpdateAll').disabled = false;
+        refreshStore();
+    };
+    $('btnStore').onclick = () => openStore();
+    window.openStore = openStore;
+    // Plakietka z liczbą aktualizacji przy przycisku Sklep
+    setTimeout(() => deck.storeList().then((d) => { storeData = d; updateStoreBadge(); }).catch(() => {}), 2500);
 
     load();
 })();

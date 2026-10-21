@@ -5,6 +5,7 @@
     const grid = $('grid');
     const wrap = $('wrap');
     const LONG_MS = 500;
+    const DOUBLE_MS = 280;
 
     let ws = null;
     let state = null;
@@ -154,16 +155,25 @@
             el.classList.add('pressed');
             try { el.setPointerCapture(e.pointerId); } catch {}
             if (navigator.vibrate) navigator.vibrate(12);
-            if (b.hasLong) {
+            const tr = b.triggers || {};
+            if (tr.touchStart) send({ t: 'press', key, phase: 'down' });
+            if (b.hasLong || tr.longPress) {
                 timer = setTimeout(() => {
                     longSent = true;
                     if (navigator.vibrate) navigator.vibrate([10, 40, 20]);
                     send({ t: 'press', key, phase: 'long' });
                 }, LONG_MS);
-            } else {
+            } else if (!tr.doublePress) {
                 send({ t: 'press', key, phase: 'press' });
             }
         });
+        // Krótkie naciśnięcie, a przy bloku „Podwójne naciśnięcie” — czekamy chwilę na drugie dotknięcie
+        let tapTimer = null;
+        const shortPress = (tr) => {
+            if (!tr.doublePress) return send({ t: 'press', key, phase: 'press' });
+            if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; if (navigator.vibrate) navigator.vibrate([10, 30, 10]); return send({ t: 'press', key, phase: 'double' }); }
+            tapTimer = setTimeout(() => { tapTimer = null; send({ t: 'press', key, phase: 'press' }); }, DOUBLE_MS);
+        };
         const up = (cancelled) => {
             if (!active) return;
             active = false;
@@ -171,8 +181,9 @@
             el.classList.remove('pressed');
             const b = button();
             if (!b) return;
-            if (b.hasLong && !longSent && !cancelled) send({ t: 'press', key, phase: 'press' });
-            send({ t: 'press', key, phase: 'release' });
+            const tr = b.triggers || {};
+            if ((b.hasLong || tr.longPress || tr.doublePress) && !longSent && !cancelled) shortPress(tr);
+            if (tr.release !== false) send({ t: 'press', key, phase: 'release' });
         };
         el.addEventListener('pointerup', () => up(false));
         el.addEventListener('pointercancel', () => up(true));

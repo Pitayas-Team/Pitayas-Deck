@@ -1,0 +1,37 @@
+{
+  "id": "discord",
+  "name": "Discord",
+  "version": "1.1.0",
+  "icon": "headphones",
+  "color": "#5865f2",
+  "category": "communication",
+  "featured": true,
+  "description": "Wyciszenie, słuchawki, głośności, kanały głosowe i tryb mówienia.",
+  "longDescription": "Łączy się z aplikacją Discord na tym komputerze przez Discord RPC i pokazuje prawdziwy stan: czy jesteś wyciszony, na jakim kanale, czy mówisz. Bez własnej aplikacji Discord działa wyciszanie przez skróty klawiszowe.",
+  "features": [
+    "Wycisz mikrofon / wyłącz dźwięk",
+    "Głośność mikrofonu i dźwięku",
+    "Naciśnij, aby mówić / aktywność głosowa",
+    "Tłumienie szumów, usuwanie echa",
+    "Dołącz do kanału / rozłącz",
+    "Zmienne: wyciszony, kanał, serwer, mówisz, ping"
+  ],
+  "tags": [
+    "discord",
+    "głos",
+    "mikrofon",
+    "czat"
+  ],
+  "changelog": [
+    {
+      "version": "1.1.0",
+      "notes": "Dodatek przeniesiony do sklepu."
+    },
+    {
+      "version": "1.0.0",
+      "notes": "Pierwsza wersja z Discord RPC."
+    }
+  ],
+  "author": "Pitayas",
+  "license": "MIT"
+}

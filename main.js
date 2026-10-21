@@ -15,6 +15,7 @@ const { createRuntime } = require('./deck/runtime');
 const { createServer } = require('./deck/server');
 const { createPlatform } = require('./deck/platform');
 const { importMacroDeck, macroDeckDir } = require('./deck/import-macrodeck');
+const { createPluginStore } = require('./deck/plugin-store');
 
 const ICON = path.join(__dirname, 'build', 'icons', '512x512.png');
 const log = (...a) => core.log.info(...a);
@@ -37,6 +38,30 @@ const runtime = createRuntime({
         desktopNotify: (body) => new Notification({ title: 'Pitaya Deck', body: String(body || ''), icon: ICON }).show(),
     },
 });
+const pluginStore = createPluginStore({
+    appDir: __dirname,
+    pluginsDir: path.join(core.paths.data, 'plugins'),
+    dataDir: core.paths.data,
+    runtime,
+    settings: () => store.deck.settings,
+    log,
+});
+// Wszystkie wtyczki, których używają przyciski (także w blokach zagnieżdżonych)
+function usedPlugins() {
+    const ids = new Set();
+    const walk = (list) => {
+        for (const b of list || []) {
+            if (!b) continue;
+            if (b.plugin) ids.add(b.plugin);
+            for (const k of ['blocks', 'else']) if (Array.isArray(b[k])) walk(b[k]);
+            for (const br of b.branches || []) walk(br.blocks);
+            for (const cs of b.cases || []) walk(cs.blocks);
+            if (Array.isArray(b.otherwise)) walk(b.otherwise);
+        }
+    };
+    for (const f of Object.values(store.deck.folders)) for (const btn of Object.values(f.buttons || {})) for (const list of Object.values(btn.actions || {})) walk(list);
+    return [...ids];
+}
 const server = createServer({
     store,
     runtime,
@@ -145,7 +170,10 @@ if (core.singleInstance(showWindow)) {
         createTray();
         await runtime.startAll();
         await startServer();
+        // Dodatki ze sklepu potrzebne przyciskom (np. Spotify po przeniesieniu do sklepu) instalują się same
+        const added = await pluginStore.ensure(usedPlugins()).catch(() => []);
         toEditor('deck:ready');
+        if (added.length) toEditor('deck:notify', `Zainstalowano ze sklepu dodatki używane przez Twoje przyciski: ${added.join(', ')}`, 'success');
     });
     app.on('before-quit', () => { isQuitting = true; store.flush(); });
     app.on('window-all-closed', () => {});
@@ -221,6 +249,17 @@ ipcMain.handle('deck:test-button', async (e, folderId, key, phase = 'press') => 
 ipcMain.handle('deck:test-slider', (e, folderId, key, value) => server.slider('editor', folderId, key, value));
 ipcMain.handle('deck:variable-set', (e, name, value, type) => runtime.setUserVariable(name, value, type));
 ipcMain.handle('deck:variable-delete', (e, name) => runtime.deleteUserVariable(name));
+// ───── Sklep z dodatkami ─────
+ipcMain.handle('deck:store-list', (e, force) => pluginStore.list(force));
+ipcMain.handle('deck:store-install', async (e, id) => { const r = await pluginStore.install(id); return { ...r, plugins: runtime.describe() }; });
+ipcMain.handle('deck:store-uninstall', async (e, id) => {
+    const used = usedPlugins().includes(id);
+    const r = await pluginStore.uninstall(id);
+    return { ...r, used, plugins: runtime.describe() };
+});
+ipcMain.handle('deck:store-update-all', async () => ({ updated: await pluginStore.updateAll(), plugins: runtime.describe() }));
+ipcMain.handle('deck:store-used', () => usedPlugins());
+ipcMain.handle('deck:store-url', (e, url) => { store.setSettings({ storeUrl: String(url || '').trim() }); return pluginStore.list(true); });
 ipcMain.handle('deck:open-plugins-dir', () => {
     const dir = path.join(core.paths.data, 'plugins');
     fs.mkdirSync(dir, { recursive: true });

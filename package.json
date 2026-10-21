@@ -1,6 +1,6 @@
 {
   "name": "pitaya-deck",
-  "version": "0.2.1-beta",
+  "version": "0.3.0-beta",
   "description": "Pitaya Deck — telefon jako panel przycisków do komputera",
   "main": "main.js",
   "author": {

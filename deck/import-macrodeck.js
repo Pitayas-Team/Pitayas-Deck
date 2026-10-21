@@ -131,7 +131,7 @@ function importMacroDeck(store, { log = () => {} } = {}) {
         const out = {};
         let list = [];
         try { list = typeof raw === 'string' ? JSON.parse(raw) : raw || []; } catch { return out; }
-        const phases = { onShortPress: 'press', onPress: 'press', onLongPress: 'longPress', onTouchEnd: 'release', onRelease: 'release' };
+        const phases = { onShortPress: 'press', onPress: 'press', onLongPress: 'longPress', onDoublePress: 'doublePress', onTouchStart: 'touchStart', onTouchEnd: 'release', onRelease: 'release', onStateChange: 'stateChange', onValueChanged: 'change', onValueChange: 'change' };
         for (const t of list) {
             const phase = phases[t.triggerType];
             if (!phase) { skip(`wyzwalacz ${t.triggerType}`); continue; }
@@ -139,7 +139,12 @@ function importMacroDeck(store, { log = () => {} } = {}) {
                 for (const n of nodes || []) {
                     if (n.type === 'action') {
                         const a = action(n);
-                        if (a) { (out[phase] = out[phase] || []).push(a); summary.actions++; }
+                        if (a) {
+                            if (n.disabled) a.enabled = false;
+                            if (n.comment) a.comment = String(n.comment);
+                            (out[phase] = out[phase] || []).push(a);
+                            summary.actions++;
+                        }
                     } else if (n.type) skip(`blok ${n.type}`);
                     walk(n.children);
                 }
