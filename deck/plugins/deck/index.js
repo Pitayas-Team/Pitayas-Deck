@@ -76,6 +76,16 @@ module.exports = {
             },
         },
         {
+            id: 'run-script',
+            name: 'Uruchom skrypt',
+            description: 'Wykonuje jeden z Twoich skryptów (strona Skrypty) i czeka na jego koniec',
+            fields: [{ key: 'script', label: 'Skrypt', type: 'select', options: async (ctx) => ctx.deck.scripts() }],
+            run: async (c, ctx) => {
+                if (!c.script) throw new Error('Wybierz skrypt');
+                await ctx.deck.runScript(c.script, { device: ctx.device, button: ctx.button, folderId: ctx.folderId, key: ctx.key, locals: ctx.locals, scriptDepth: ctx.scriptDepth });
+            },
+        },
+        {
             id: 'delay',
             name: 'Czekaj',
             description: 'Pauza między akcjami',

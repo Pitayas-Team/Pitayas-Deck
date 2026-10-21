@@ -208,7 +208,7 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
         return {
             t: 'state',
             profile: { id: profile.id, name: profile.name, cols: grid.cols, rows: grid.rows },
-            style: { spacing: profile.spacing ?? 10, radius: profile.radius ?? 22, background: profile.background || '' },
+            style: { spacing: profile.spacing ?? 10, radius: profile.radius ?? 22, background: profile.background || '', emptyCells: profile.emptyCells || 'visible' },
             folder: { id: folder ? folder.id : null, name: folder ? folder.name : '', canBack: Boolean(folder && folder.parent) },
             buttons,
             device: device ? { id: device.id, name: device.name } : null,
@@ -311,6 +311,16 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
             if (stateId === 'previous') next = (cur - 1 + w.states.length) % w.states.length;
             if (next < 0) throw new Error(`Brak stanu „${stateId}”`);
             store.setWidgetState(folderId, key, w.states[next].id);
+        },
+        // Skrypty: wspólne listy bloków (strona „Skrypty” w edytorze)
+        scripts: () => (store.deck.scripts || []).map((x) => ({ value: x.id, label: x.name || 'Skrypt' })),
+        async runScript(id, extra = {}) {
+            const sc = (store.deck.scripts || []).find((x) => x.id === id);
+            if (!sc) throw new Error('Nie ma takiego skryptu');
+            const depth = (extra.scriptDepth || 0) + 1;
+            if (depth > 8) throw new Error('Za głębokie wywołania skryptów (skrypt wywołuje sam siebie?)');
+            const errors = await runtime.runActions(sc.blocks || [], { ...extra, scriptDepth: depth });
+            if (errors.length) throw new Error(`Skrypt „${sc.name}”: ${errors.join(' · ')}`);
         },
         profiles: () => store.deck.profiles.map((p) => ({ value: p.id, label: p.name })),
         folders: () => Object.values(store.deck.folders).map((f) => ({ value: f.id, label: `${(store.profileOfFolder(f.id) || {}).name || '?'} › ${store.folderPath(f.id).map((x) => x.name).join(' › ')}` })),

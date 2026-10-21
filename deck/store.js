@@ -50,7 +50,9 @@ function createStore(dataDir, log = () => {}) {
     // Uzupełnienie brakujących pól po aktualizacjach
     const def = defaultDeck();
     for (const key of ['profiles', 'folders', 'variables', 'devices', 'settings']) if (!deck[key]) deck[key] = def[key];
-    if (!deck.widgetStates) deck.widgetStates = {};   // aktywny stan przycisków wielostanowych: "<folder>/<x,y>" → id stanu
+    if (!deck.widgetStates) deck.widgetStates = {};
+    if (!Array.isArray(deck.scripts)) deck.scripts = [];          // Skrypty: nazwane listy bloków do użycia w wielu przyciskach
+    if (!Array.isArray(deck.automations)) deck.automations = [];  // Automatyzacje: bloki uruchamiane zdarzeniem, bez dotykania przycisku   // aktywny stan przycisków wielostanowych: "<folder>/<x,y>" → id stanu
     deck.settings = { ...def.settings, ...deck.settings };
     if (!deck.profiles.length) { deck.profiles = def.profiles; deck.folders = { ...deck.folders, ...def.folders }; }
 
@@ -111,6 +113,8 @@ function createStore(dataDir, log = () => {}) {
             if (patch.spacing !== undefined) p.spacing = Math.max(0, Math.min(40, parseInt(patch.spacing, 10) || 0));
             if (patch.radius !== undefined) p.radius = Math.max(0, Math.min(50, parseInt(patch.radius, 10) || 0));
             if (patch.background !== undefined) p.background = String(patch.background || '');
+            if (Array.isArray(patch.favorites)) p.favorites = patch.favorites.filter((id) => deck.folders[id]);
+            if (patch.emptyCells !== undefined) p.emptyCells = patch.emptyCells === 'transparent' ? 'transparent' : 'visible';
             changed('profiles');
             return p;
         },
@@ -193,6 +197,9 @@ function createStore(dataDir, log = () => {}) {
         },
 
         // Urządzenia (telefony, tablety, przeglądarki)
+        // Skrypty i automatyzacje zapisujemy w całości (edytor wysyła całą listę)
+        setScripts(list) { deck.scripts = Array.isArray(list) ? list : []; changed('scripts'); return deck.scripts; },
+        setAutomations(list) { deck.automations = Array.isArray(list) ? list : []; changed('automations'); return deck.automations; },
         device: (id) => deck.devices[id] || null,
         upsertDevice(id, patch) {
             const d = deck.devices[id] || { id, name: 'Urządzenie', profile: deck.profiles[0].id, approved: !deck.settings.requireApproval, added: Date.now() };

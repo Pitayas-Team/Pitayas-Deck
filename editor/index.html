@@ -8,18 +8,23 @@
   <link rel="stylesheet" href="editor.css">
 </head>
 <body>
-  <!-- PASEK OKNA -->
+  <!-- PASEK OKNA: marka · profil · połączenie -->
   <div class="m-titlebar">
     <div class="m-titlebar-brand">
+      <button class="tb-btn" id="btnRail" title="Zwiń / rozwiń menu" data-i="panel-left"></button>
       <img src="../build/icons/128x128.png" alt="">
       <span class="m-titlebar-name">Pitaya Deck</span>
     </div>
-    <button class="conn-pill" id="connPill" title="Połącz telefon"><span class="m-status-dot" id="connDot"></span><span id="connText">Uruchamianie…</span></button>
+    <div class="tb-center">
+      <div class="profile-picker" id="profilePicker">
+        <button class="pp-btn" id="ppBtn"><span class="pp-badge" id="ppBadge">G</span><span id="ppName">Profil</span><span class="pp-chev" data-i="chevron-down"></span></button>
+        <div class="pp-menu" id="ppMenu" hidden></div>
+      </div>
+    </div>
     <div class="m-titlebar-actions">
-      <button class="m-btn small store-btn" id="btnStore" title="Sklep z dodatkami"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9h18l-1.6 10.2a2 2 0 0 1-2 1.8H6.6a2 2 0 0 1-2-1.8z"/><path d="M8 9V7a4 4 0 0 1 8 0v2"/></svg>Sklep<span class="store-badge" id="storeBadge" hidden></span></button>
-      <button class="m-btn small accent" id="btnConnect">Połącz telefon</button>
+      <button class="conn-pill" id="connPill" title="Połącz telefon"><span class="m-status-dot" id="connDot"></span><span id="connText">Uruchamianie…</span><span data-i="wifi"></span></button>
       <div class="m-update-pill" id="updatePill" title="Dostępna aktualizacja">Aktualizacja</div>
-      <button class="m-win-btn" id="btnSettings" title="Ustawienia" onclick="openSettings('general')"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg><span class="m-dot"></span></button>
+      <button class="m-win-btn" id="btnSettings" title="Ustawienia" hidden></button>
       <div class="m-win-sep"></div>
       <button class="m-win-btn" data-win="min" title="Minimalizuj"><svg viewBox="0 0 12 12"><path d="M1 6.5h10"/></svg></button>
       <button class="m-win-btn" id="btnMax" title="Maksymalizuj"><svg viewBox="0 0 12 12"><rect x="1.5" y="1.5" width="9" height="9"/></svg></button>
@@ -27,218 +32,282 @@
     </div>
   </div>
 
-  <div class="layout">
-    <!-- LEWY PANEL -->
-    <aside class="side">
-      <section class="side-sec">
-        <div class="sec-head"><span class="m-label">Profil</span>
-          <div class="sec-tools">
-            <button class="tool" id="btnProfileAdd" title="Nowy profil">＋</button>
-            <button class="tool" id="btnProfileRename" title="Zmień nazwę">✎</button>
-            <button class="tool" id="btnProfileDelete" title="Usuń profil">🗑</button>
-          </div>
-        </div>
-        <select class="m-select" id="profileSelect"></select>
-        <div class="grid-size">
-          <label>Kolumny <input type="number" class="m-input" id="colsInput" min="1" max="12"></label>
-          <span>×</span>
-          <label>Wiersze <input type="number" class="m-input" id="rowsInput" min="1" max="10"></label>
-        </div>
-        <details class="side-more">
-          <summary>Wygląd profilu</summary>
-          <label class="mini">Odstęp między przyciskami <span id="spacingVal"></span><input type="range" id="spacingInput" min="0" max="30"></label>
-          <label class="mini">Zaokrąglenie <span id="radiusVal"></span><input type="range" id="radiusInput" min="0" max="50"></label>
-          <div class="mini">Tło decka na telefonie</div>
-          <div class="colors" id="deckBgColors"></div>
-        </details>
-      </section>
+  <div class="shell" id="shell">
+    <!-- LEWY PASEK STRON (jak w Macro Deck 3) -->
+    <nav class="rail" id="rail">
+      <a data-page="deck" class="active"><span data-i="layout-grid"></span><b>Deck</b></a>
+      <div class="rail-sep"></div>
+      <a data-page="scripts"><span data-i="list-video"></span><b>Skrypty</b></a>
+      <a data-page="automations"><span data-i="zap"></span><b>Automatyzacje</b></a>
+      <div class="rail-sep"></div>
+      <a data-page="variables"><span data-i="braces"></span><b>Zmienne</b></a>
+      <a data-page="integrations"><span data-i="puzzle"></span><b>Integracje</b></a>
+      <a data-page="library"><span data-i="layers"></span><b>Biblioteka</b></a>
+      <div class="rail-sep"></div>
+      <a data-page="store"><span data-i="store"></span><b>Sklep</b><i class="rail-badge" id="storeBadge" hidden></i></a>
+      <div class="rail-grow"></div>
+      <a data-page="devices"><span data-i="smartphone"></span><b>Urządzenia</b><i class="rail-badge" id="devBadge" hidden></i></a>
+      <a data-page="settings"><span data-i="settings"></span><b>Ustawienia</b></a>
+    </nav>
 
-      <section class="side-sec grow">
-        <div class="sec-head"><span class="m-label">Foldery</span>
-          <div class="sec-tools">
-            <button class="tool" id="btnFolderAdd" title="Nowy folder w bieżącym">＋</button>
-            <button class="tool" id="btnFolderRename" title="Zmień nazwę">✎</button>
-            <button class="tool" id="btnFolderDelete" title="Usuń folder">🗑</button>
-          </div>
-        </div>
-        <div class="tree" id="tree"></div>
-        <div class="grid-size folder-grid">
-          <label>Siatka folderu <input type="number" class="m-input" id="fColsInput" min="1" max="12" placeholder="auto"></label>
-          <span>×</span>
-          <label>&nbsp;<input type="number" class="m-input" id="fRowsInput" min="1" max="10" placeholder="auto"></label>
-        </div>
-      </section>
-
-      <section class="side-sec">
-        <div class="sec-head"><span class="m-label">Urządzenia</span></div>
-        <div class="devices" id="devices"></div>
-      </section>
-    </aside>
-
-    <!-- ŚRODEK: SIATKA -->
-    <main class="center">
-      <div class="crumbs" id="crumbs"></div>
-      <div class="stage" id="stage">
-        <div class="deck-grid" id="grid"></div>
-      </div>
-      <div class="hint">Kliknij puste pole, żeby dodać widżet · przeciągnij, żeby przenieść · prawy przycisk myszy: kopiuj / wklej / usuń · upuść obraz na przycisk, żeby ustawić ikonę</div>
-    </main>
-
-    <!-- PRAWY PANEL: INSPEKTOR -->
-    <aside class="inspector" id="inspector">
-      <div class="insp-empty" id="inspEmpty">
-        <div class="insp-empty-icon">▦</div>
-        <div class="m-panel-title">Wybierz pole</div>
-        <div class="m-small">Kliknij puste pole siatki, żeby dodać przycisk albo widżet, albo istniejący, żeby go zmienić.</div>
-      </div>
-
-      <div class="insp" id="insp" hidden>
-        <div class="insp-head">
-          <div class="insp-preview" id="inspPreview"></div>
-          <div class="insp-title">
-            <div class="m-panel-title" id="inspTitle">Przycisk</div>
-            <div class="m-small" id="inspPos"></div>
-          </div>
-          <button class="m-btn small" id="btnTest" title="Uruchom jak naciśnięcie na telefonie">▶ Testuj</button>
-        </div>
-
-        <div class="m-tabs insp-tabs" id="inspTabs">
-          <button class="m-tab active" data-tab="look">Wygląd</button>
-          <button class="m-tab" data-tab="widget" id="tabWidget">Widżet</button>
-          <button class="m-tab" data-tab="actions">Akcje <span class="tab-count" id="actionsCount"></span></button>
-          <button class="m-tab" data-tab="state" id="tabState">Stan</button>
-        </div>
-
-        <!-- WYGLĄD -->
-        <div class="insp-body" data-pane="look">
-          <div class="row2">
-            <div class="m-field">
-              <span class="m-label">Rozmiar (pola)</span>
-              <div class="size-row"><input type="number" class="m-input" id="fW" min="1" max="12"><span>×</span><input type="number" class="m-input" id="fH" min="1" max="10"></div>
+    <main class="pages">
+      <!-- ───── DECK ───── -->
+      <section class="page page-deck" data-page="deck">
+        <div class="deck-main">
+          <header class="page-head">
+            <div>
+              <h1 id="folderTitle">Start</h1>
+              <div class="sub" id="gridSub">Siatka 5 × 3</div>
             </div>
-            <div class="m-field">
-              <span class="m-label">Typ</span>
-              <div class="type-chip" id="typeChip">Przycisk</div>
-            </div>
-          </div>
-          <div class="m-field" id="labelField">
-            <label class="m-label" for="fLabel">Napis</label>
-            <div class="with-btn">
-              <textarea class="m-input one" id="fLabel" rows="1" placeholder="np. Scena 1 albo {system.time}"></textarea>
-              <button class="m-btn small icon-only" id="btnInsertVar" title="Wstaw zmienną">{ }</button>
-            </div>
-          </div>
-          <div class="row2" id="labelStyle">
-            <div class="m-field">
-              <label class="m-label" for="fLabelPos">Położenie napisu</label>
-              <select class="m-select" id="fLabelPos">
-                <option value="bottom">Pod ikoną</option><option value="top">Nad ikoną</option>
-                <option value="center">Na środku</option><option value="hidden">Bez napisu</option>
-              </select>
-            </div>
-            <div class="m-field">
-              <span class="m-label">Wyrównanie</span>
-              <div class="seg small" id="fAlign"><button data-v="left">⟸</button><button data-v="center">≡</button><button data-v="right">⟹</button></div>
-            </div>
-          </div>
-          <div class="m-field">
-            <label class="m-label" for="fFont">Rozmiar napisu <span id="fFontVal"></span></label>
-            <input type="range" id="fFont" min="7" max="40">
-            <div class="row-btns">
-              <label class="check"><input type="checkbox" id="fShadow"> Cień napisu</label>
-              <label class="check"><input type="checkbox" id="fOutline"> Obrys napisu</label>
-            </div>
-          </div>
-
-          <div class="m-field" id="iconField">
-            <span class="m-label">Ikona</span>
-            <div class="seg" id="iconType">
-              <button data-v="none">Brak</button><button data-v="lucide">Ikona</button><button data-v="emoji">Emoji</button><button data-v="image">Obraz</button>
-            </div>
-            <div class="icon-pane" data-icon="lucide">
-              <input class="m-input" id="iconSearch" placeholder="Szukaj ikony: mikrofon, głośność, play, folder, steam…">
-              <div class="lucide-grid" id="lucideGrid"></div>
-              <div class="row-btns"><span class="m-small" id="iconCount"></span><span style="flex:1"></span><span class="m-small">Kolor ikony</span><div class="colors" id="iconColors"></div></div>
-            </div>
-            <div class="icon-pane" data-icon="emoji">
-              <input class="m-input" id="fEmoji" maxlength="8" placeholder="Wklej emoji, np. 🎮">
-              <div class="emojis" id="emojis"></div>
-            </div>
-            <div class="icon-pane" data-icon="image">
-              <div class="row-btns">
-                <button class="m-btn small" id="btnImage">Wybierz obraz…</button>
-                <div class="seg small" id="fFit"><button data-v="contain">Dopasuj</button><button data-v="cover">Wypełnij</button></div>
+            <div class="head-tools">
+              <button class="m-btn small" id="btnTestMode" title="Tryb testu: kliknięcie naciska przycisk zamiast go edytować"><span data-i="play"></span>Testuj klikając</button>
+              <div class="pop-wrap">
+                <button class="m-btn small icon-only" id="btnGridMenu" title="Ustawienia siatki"><span data-i="ellipsis-vertical"></span></button>
+                <div class="popover grid-pop" id="gridPop" hidden>
+                  <div class="gp-row"><label>Kolumny <b id="gpColsVal"></b></label><button class="tool" data-reset="cols" title="Jak w profilu" data-i="rotate-ccw"></button></div>
+                  <input type="range" id="gpCols" min="1" max="16">
+                  <div class="gp-row"><label>Wiersze <b id="gpRowsVal"></b></label><button class="tool" data-reset="rows" title="Jak w profilu" data-i="rotate-ccw"></button></div>
+                  <input type="range" id="gpRows" min="1" max="12">
+                  <div class="gp-sep"></div>
+                  <div class="gp-note">Dla całego profilu</div>
+                  <div class="gp-row"><label>Odstępy widżetów <b id="gpGapVal"></b></label></div>
+                  <input type="range" id="gpGap" min="0" max="40">
+                  <div class="gp-row"><label>Zaokrąglenie <b id="gpRadVal"></b></label></div>
+                  <input type="range" id="gpRad" min="0" max="50">
+                  <div class="gp-row"><label>Puste komórki</label></div>
+                  <div class="seg small" id="gpEmpty"><button data-v="visible">Widoczne</button><button data-v="transparent">Przezroczyste</button></div>
+                  <div class="gp-row"><label>Tło decka na telefonie</label></div>
+                  <div class="colors small" id="gpBg"></div>
+                </div>
               </div>
-              <label class="mini">Powiększenie <span id="fZoomVal"></span><input type="range" id="fZoom" min="40" max="200"></label>
-              <label class="mini">Przezroczystość ikony <span id="fOpacityVal"></span><input type="range" id="fOpacity" min="10" max="100"></label>
-              <div class="m-small">Możesz też przeciągnąć obraz z dysku na pole w siatce.</div>
             </div>
+          </header>
+          <div class="stage" id="stage"><div class="deck-grid" id="grid"></div></div>
+          <div class="deck-hint">Kliknij puste pole, żeby dodać widżet · kliknij widżet, żeby go edytować · przeciągnij, żeby przenieść · prawy przycisk: więcej</div>
+        </div>
+        <aside class="folders">
+          <div class="fold-head">FOLDERY</div>
+          <div class="tree" id="tree"></div>
+          <div class="fold-foot">
+            <button class="m-btn small" id="btnFolderAdd"><span data-i="plus"></span>Nowy folder</button>
           </div>
+        </aside>
+      </section>
 
-          <div class="row2">
-            <div class="m-field">
-              <span class="m-label">Tło</span>
-              <div class="colors" id="bgColors"></div>
-            </div>
-            <div class="m-field">
-              <span class="m-label">Kolor napisu</span>
-              <div class="colors" id="fgColors"></div>
-            </div>
+      <!-- ───── EDYCJA WIDŻETU (pełna strona) ───── -->
+      <section class="page page-widget" data-page="widget" hidden>
+        <header class="we-head">
+          <button class="tool big" id="weBack" title="Wróć do decka" data-i="arrow-left"></button>
+          <div class="we-title"><b id="weType">Przycisk akcji</b><span id="wePos"></span></div>
+          <div class="seg small we-mode" id="weMode"><button data-v="visual" class="active">Wizualny</button><button data-v="json">JSON</button></div>
+          <div class="we-tools">
+            <button class="m-btn small" id="weDuplicate"><span data-i="copy"></span>Duplikuj</button>
+            <button class="m-btn small danger" id="weDelete"><span data-i="trash-2"></span>Usuń</button>
           </div>
-          <div class="m-field">
-            <label class="check"><input type="checkbox" id="fBorder"> Ramka</label>
-            <div class="colors" id="borderColors"></div>
+        </header>
+        <div class="we-body" id="weVisual">
+          <!-- Lewa kolumna: wygląd -->
+          <aside class="we-look" id="weLook">
+            <div class="we-preview" id="wePreview"></div>
+            <div class="we-scroll" id="weLookBody"></div>
+          </aside>
+          <!-- Prawa część: akcje -->
+          <div class="we-actions">
+            <div class="ab-toolbar">
+              <div class="trigger-row" id="triggerRow"></div>
+              <div class="ab-right">
+                <button class="m-btn small" id="btnVars"><span data-i="braces"></span>Zmienne</button>
+                <button class="m-btn small" id="btnRun"><span data-i="play"></span>Uruchom</button>
+              </div>
+            </div>
+            <div class="ab-hint" id="triggerHint"></div>
+            <div class="ab-list" id="actionsList"></div>
           </div>
         </div>
-
-        <!-- WIDŻET (ustawienia zależne od typu) -->
-        <div class="insp-body" data-pane="widget" hidden><div id="widgetPane"></div></div>
-
-        <!-- AKCJE -->
-        <div class="insp-body" data-pane="actions" hidden>
-          <div class="seg small" id="phase"></div>
-          <div class="m-small phase-hint" id="phaseHint"></div>
-          <div class="actions-list" id="actionsList"></div>
-          <button class="m-btn block" id="btnAddAction">＋ Dodaj akcję</button>
+        <div class="we-json" id="weJson" hidden>
+          <div class="json-bar"><span class="m-small">Cały widżet jako JSON. Zmiany zapisują się po kliknięciu „Zastosuj”.</span><button class="m-btn small accent" id="jsonApply">Zastosuj</button></div>
+          <textarea class="m-input json-area" id="jsonArea" spellcheck="false"></textarea>
         </div>
+      </section>
 
-        <!-- STAN -->
-        <div class="insp-body" data-pane="state" hidden><div id="statePane"></div></div>
+      <!-- ───── SKRYPTY / AUTOMATYZACJE (lista + edytor) ───── -->
+      <section class="page page-split" data-page="scripts" hidden>
+        <aside class="split-list">
+          <div class="split-head"><h1>Skrypty</h1><button class="m-btn small accent" id="btnScriptAdd"><span data-i="plus"></span>Nowy</button></div>
+          <div class="m-small split-desc">Te same akcje w wielu przyciskach. Użyj w przycisku bloku „Uruchom skrypt”.</div>
+          <div class="split-items" id="scriptList"></div>
+        </aside>
+        <div class="split-main" id="scriptMain"></div>
+      </section>
+      <section class="page page-split" data-page="automations" hidden>
+        <aside class="split-list">
+          <div class="split-head"><h1>Automatyzacje</h1><button class="m-btn small accent" id="btnAutoAdd"><span data-i="plus"></span>Nowa</button></div>
+          <div class="m-small split-desc">Reaguj na zdarzenie bez dotykania przycisku: o godzinie, gdy zmieni się zmienna, co jakiś czas.</div>
+          <div class="split-items" id="autoList"></div>
+        </aside>
+        <div class="split-main" id="autoMain"></div>
+      </section>
 
-        <div class="insp-foot">
-          <button class="m-btn small" id="btnDuplicate">Duplikuj</button>
-          <button class="m-btn small danger" id="btnDelete">Usuń</button>
+      <!-- ───── ZMIENNE ───── -->
+      <section class="page page-split" data-page="variables" hidden>
+        <aside class="split-list">
+          <div class="split-head"><h1>Zmienne</h1></div>
+          <div class="split-items" id="varCats"></div>
+        </aside>
+        <div class="split-main">
+          <div class="list-head"><div><h2 id="varTitle">Wszystkie zmienne</h2><div class="m-small" id="varCount"></div></div><button class="m-btn small accent" id="btnNewVar"><span data-i="plus"></span>Nowa zmienna</button></div>
+          <input class="m-input" id="varFilter" placeholder="Szukaj zmiennych…">
+          <div class="var-list" id="varList"></div>
+        </div>
+      </section>
+
+      <!-- ───── INTEGRACJE ───── -->
+      <section class="page page-list" data-page="integrations" hidden>
+        <div class="list-head"><div><h1>Integracje</h1><div class="m-small" id="intCount"></div></div><button class="m-btn small accent" data-goto="store"><span data-i="plus"></span>Dodaj ze sklepu</button></div>
+        <input class="m-input" id="intFilter" placeholder="Szukaj integracji…">
+        <div class="int-list" id="intList"></div>
+      </section>
+      <section class="page page-list" data-page="integration" hidden>
+        <div class="int-detail" id="intDetail"></div>
+      </section>
+
+      <!-- ───── BIBLIOTEKA ───── -->
+      <section class="page page-list" data-page="library" hidden>
+        <div class="list-head"><div><h1>Biblioteka</h1><div class="m-small">Ikony i obrazy do przycisków.</div></div><button class="m-btn small" id="btnLibUpload"><span data-i="upload"></span>Dodaj obraz</button></div>
+        <div class="seg small" id="libTabs"><button data-v="lucide" class="active">Ikony Lucide</button><button data-v="images">Twoje obrazy</button></div>
+        <input class="m-input" id="libSearch" placeholder="Szukaj ikon: mikrofon, play, folder…">
+        <div class="lib-grid" id="libGrid"></div>
+      </section>
+
+      <!-- ───── SKLEP ───── -->
+      <section class="page page-list page-store" data-page="store" hidden>
+        <div class="store-hero">
+          <h1>Sklep z dodatkami</h1>
+          <p>Dodatki dokładają do decka nowe akcje, zmienne i integracje.</p>
+          <input class="m-input" id="storeSearch" placeholder="Szukaj dodatków: Spotify, Discord, światło…">
+          <div class="store-chips" id="storeCats"></div>
+        </div>
+        <div class="store-bar"><b id="storeHeading">Wszystkie</b><button class="m-btn small" id="btnStoreUpdateAll" hidden>Aktualizuj wszystko</button></div>
+        <div class="store-grid" id="storeGrid"></div>
+        <div class="store-detail" id="storeDetail" hidden></div>
+        <details class="store-own"><summary>Własny sklep (adres katalogu)</summary><input class="m-input" id="storeUrlInput" placeholder="https://…"><div class="m-small" id="storeUrlErr"></div></details>
+      </section>
+
+      <!-- ───── URZĄDZENIA ───── -->
+      <section class="page page-list" data-page="devices" hidden>
+        <div class="list-head"><div><h1>Urządzenia</h1><div class="m-small">Telefony i tablety połączone z deckiem.</div></div><button class="m-btn small accent" id="btnConnect"><span data-i="qr-code"></span>Połącz nowe</button></div>
+        <div class="dev-list" id="devices"></div>
+      </section>
+
+      <!-- ───── USTAWIENIA ───── -->
+      <section class="page page-list" data-page="settings" hidden>
+        <div class="list-head"><div><h1>Ustawienia</h1></div></div>
+        <div class="set-grid">
+          <div class="card import-card" id="importCard" hidden>
+            <span class="ic-ico" data-i="import"></span>
+            <div><b>Przenieś deck z Macro Deck</b><div class="m-small">Foldery, przyciski ze stanami, suwaki, zegar, wskaźniki, odtwarzacz i ikony trafią do nowego profilu. Macro Deck zostaje bez zmian.</div><div class="m-small" id="importResult"></div></div>
+            <button class="m-btn small accent" id="btnImportMd">Importuj</button>
+          </div>
+          <div class="card">
+            <h3>Połączenie</h3>
+            <div class="m-field"><label class="m-label">Port serwera</label><input class="m-input" id="fPort" type="number" min="1024" max="65535"></div>
+            <label class="check"><input type="checkbox" id="fApproval2"> Pytaj o zgodę przy nowym urządzeniu</label>
+            <label class="check"><input type="checkbox" id="fClock"> Pokazuj zegar na pasku telefonu</label>
+          </div>
+          <div class="card">
+            <h3>Klawiatura</h3>
+            <div class="m-small" id="kbStatus">Sprawdzanie…</div>
+            <div class="m-small">Skróty i wpisywanie tekstu działają przez wirtualną klawiaturę (Linux: uinput, ydotool, xdotool albo wtype).</div>
+          </div>
+          <div class="card">
+            <h3>Kopia zapasowa</h3>
+            <div class="row-btns"><button class="m-btn small" id="btnExport">Eksportuj deck…</button><button class="m-btn small" id="btnImport">Importuj deck…</button></div>
+            <div class="row-btns"><button class="m-btn small" id="btnPluginsDir">Otwórz folder wtyczek</button></div>
+          </div>
+          <!-- O programie i aktualizacje (Pitaya Core: identyfikatory wymagane przez pitaya-ui.js) -->
+          <div class="card wide" id="modalSettings">
+            <div class="m-about">
+              <img src="../build/icons/128x128.png" alt="">
+              <div>
+                <div class="m-about-name">Pitaya Deck</div>
+                <div class="m-about-desc">Twój telefon jako panel przycisków do komputera</div>
+                <div class="m-small">Wersja: <span id="appVersionText">—</span></div>
+              </div>
+            </div>
+            <div class="m-update-card">
+              <div class="m-update-head">
+                <div>
+                  <div class="m-update-title">Aktualizacje z GitHub</div>
+                  <div class="m-update-status" id="updateStatusText">Sprawdź, czy jest nowsza wersja w repozytorium</div>
+                </div>
+                <button class="m-btn small" id="btnCheckUpdate">Sprawdź</button>
+              </div>
+              <div class="m-update-details" id="updateDetails">
+                <div id="updateInfo"></div>
+                <div style="display:flex; gap:8px;">
+                  <button class="m-btn small success" id="btnApplyUpdate">Zainstaluj aktualizację</button>
+                  <button class="m-btn small accent" id="btnRestartApp" style="display:none;">Uruchom ponownie</button>
+                </div>
+              </div>
+            </div>
+            <div class="m-field">
+              <span class="m-label">Folder danych (Pitaya Core)</span>
+              <div class="data-row"><code id="dataDirText">—</code><button class="m-btn small" id="btnOpenDataDir">Otwórz</button></div>
+            </div>
+            <div class="m-small">Ikony: Lucide (licencja ISC, © Lucide Icons and Contributors).</div>
+            <div class="m-small">Repozytorium: <a class="m-link" id="repoLink" href="#">github.com/MangoLabz/Pitayas-Deck</a></div>
+            <div class="row-btns"><button class="m-btn small danger" id="btnQuit">Zakończ Pitaya Deck</button></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="statusbar"><span id="statusVersion">Pitaya Deck</span><span class="sb-right" id="statusRight"></span></footer>
+
+  <!-- OKNO: WYBÓR TYPU WIDŻETU -->
+  <div class="m-modal-overlay" id="modalWidgetType">
+    <div class="m-modal wtype-modal">
+      <div class="m-modal-header"><span class="m-modal-title">Wybierz typ widżetu</span><button class="m-modal-close" onclick="PitayaUI.closeModal('modalWidgetType')">✕</button></div>
+      <div class="m-modal-body">
+        <input class="m-input" id="wtSearch" placeholder="Szukaj widżetów…">
+        <div class="wt-grid" id="wtGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OKNO: DODAJ AKCJĘ (kategorie po lewej, lista po prawej) -->
+  <div class="m-modal-overlay" id="modalAction">
+    <div class="m-modal action-modal">
+      <div class="m-modal-header"><span class="m-modal-title">Dodaj akcję</span><button class="m-modal-close" onclick="PitayaUI.closeModal('modalAction')">✕</button></div>
+      <div class="am-body">
+        <aside class="am-cats" id="amCats"></aside>
+        <div class="am-main">
+          <input class="m-input" id="actionSearch" placeholder="Szukaj akcji…">
+          <div class="am-list" id="actionPicker"></div>
         </div>
       </div>
-    </aside>
+    </div>
   </div>
 
-  <!-- MENU: DODAJ WIDŻET -->
-  <div class="ctx add-menu" id="addMenu" hidden>
-    <div class="ctx-title">Dodaj w tym polu</div>
-    <button data-add="button"><span>▣</span>Przycisk<small>akcje po naciśnięciu</small></button>
-    <button data-add="folder"><span>📁</span>Folder<small>przycisk otwierający nowy folder</small></button>
-    <button data-add="slider"><span>▥</span>Suwak<small>głośność, mikrofon, Spotify, zmienna</small></button>
-    <button data-add="media"><span>♪</span>Odtwarzacz<small>okładka, tytuł, przyciski (2×2)</small></button>
-    <button data-add="gauge"><span>◔</span>Wskaźniki<small>CPU, GPU, RAM, temperatura (2×2)</small></button>
-    <button data-add="clock"><span>🕒</span>Zegar<small>godzina i data (2×1)</small></button>
+  <!-- OKNO: ZMIENNE (wybór / podgląd) -->
+  <div class="m-modal-overlay" id="modalVars">
+    <div class="m-modal vars-modal">
+      <div class="m-modal-header"><span class="m-modal-title" id="varsTitle">Zmienne</span><button class="m-modal-close" onclick="PitayaUI.closeModal('modalVars')">✕</button></div>
+      <div class="am-body">
+        <aside class="am-cats" id="vmCats"></aside>
+        <div class="am-main">
+          <input class="m-input" id="varSearch" placeholder="Szukaj zmiennych…">
+          <div class="var-list" id="varPicker"></div>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <!-- MENU KONTEKSTOWE -->
-  <div class="ctx" id="ctxMenu" hidden>
-    <button data-cmd="copy">Kopiuj</button>
-    <button data-cmd="paste">Wklej</button>
-    <button data-cmd="duplicate">Duplikuj w następne wolne pole</button>
-    <button data-cmd="delete" class="danger">Usuń</button>
-  </div>
-
-  <!-- MODAL: POŁĄCZ TELEFON -->
+  <!-- OKNO: POŁĄCZ TELEFON -->
   <div class="m-modal-overlay" id="modalConnect">
     <div class="m-modal wide">
-      <div class="m-modal-header">
-        <span class="m-modal-title">Połącz telefon albo tablet</span>
-        <button class="m-modal-close" onclick="PitayaUI.closeModal('modalConnect')">✕</button>
-      </div>
+      <div class="m-modal-header"><span class="m-modal-title">Połącz telefon albo tablet</span><button class="m-modal-close" onclick="PitayaUI.closeModal('modalConnect')">✕</button></div>
       <div class="m-modal-body connect">
         <img class="qr" id="qrImg" alt="Kod QR">
         <div class="connect-info">
@@ -255,7 +324,7 @@
     </div>
   </div>
 
-  <!-- MODAL: NOWE URZĄDZENIE -->
+  <!-- OKNO: NOWE URZĄDZENIE -->
   <div class="m-modal-overlay" id="modalPairing">
     <div class="m-modal">
       <div class="m-modal-header"><span class="m-modal-title">Nowe urządzenie</span></div>
@@ -270,145 +339,15 @@
     </div>
   </div>
 
-  <!-- MODAL: WYBÓR AKCJI -->
-  <div class="m-modal-overlay" id="modalStore">
-    <div class="m-modal store-modal">
-      <div class="m-modal-header">
-        <span class="m-modal-title">Sklep z dodatkami</span>
-        <button class="m-modal-close" onclick="PitayaUI.closeModal('modalStore')">✕</button>
-      </div>
-      <div class="store-layout">
-        <aside class="store-side" id="storeCats"></aside>
-        <section class="store-main">
-          <div class="store-top">
-            <input class="m-input" id="storeSearch" placeholder="Szukaj dodatków: Spotify, Discord, światło…">
-            <button class="m-btn small" id="btnStoreUpdateAll" hidden>Aktualizuj wszystko</button>
-          </div>
-          <div class="store-grid" id="storeGrid"></div>
-          <div class="store-detail" id="storeDetail" hidden></div>
-        </section>
-      </div>
-    </div>
-  </div>
-
-  <div class="m-modal-overlay" id="modalAction">
-    <div class="m-modal wide">
-      <div class="m-modal-header">
-        <span class="m-modal-title">Dodaj akcję</span>
-        <button class="m-modal-close" onclick="PitayaUI.closeModal('modalAction')">✕</button>
-      </div>
-      <div class="m-modal-body">
-        <input class="m-input" id="actionSearch" placeholder="Szukaj: scena, głośność, skrót, playlista…">
-        <div class="action-picker" id="actionPicker"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: ZMIENNE (wstawianie / wybór) -->
-  <div class="m-modal-overlay" id="modalVars">
-    <div class="m-modal">
-      <div class="m-modal-header">
-        <span class="m-modal-title" id="varsTitle">Wstaw zmienną</span>
-        <button class="m-modal-close" onclick="PitayaUI.closeModal('modalVars')">✕</button>
-      </div>
-      <div class="m-modal-body"><input class="m-input" id="varSearch" placeholder="Szukaj zmiennej…"><div class="var-list" id="varPicker"></div></div>
-    </div>
-  </div>
-
-  <!-- MODAL: USTAWIENIA -->
-  <div class="m-modal-overlay" id="modalSettings">
-    <div class="m-modal wide tall">
-      <div class="m-modal-header">
-        <span class="m-modal-title">Ustawienia</span>
-        <button class="m-modal-close" onclick="PitayaUI.closeModal('modalSettings')">✕</button>
-      </div>
-      <div class="m-tabs settings-tabs" id="settingsTabs">
-        <button class="m-tab" data-stab="general">Ogólne</button>
-        <button class="m-tab" data-stab="plugins">Wtyczki</button>
-        <button class="m-tab" data-stab="vars">Zmienne</button>
-        <button class="m-tab" data-stab="about">O programie</button>
-      </div>
-      <div class="m-modal-body">
-        <div data-spane="general">
-          <div class="import-card" id="importCard" hidden>
-            <div class="import-icon">⇪</div>
-            <div class="import-text"><b>Przenieś deck z Macro Deck</b><div class="m-small">Foldery, przyciski ze stanami, suwaki, zegar, wskaźniki, odtwarzacz i ikony trafią do nowego profilu. Macro Deck zostaje bez zmian.</div></div>
-            <button class="m-btn small accent" id="btnImportMd">Importuj</button>
-          </div>
-          <div class="m-small" id="importResult"></div>
-          <div class="row2">
-            <div class="m-field">
-              <label class="m-label" for="fPort">Port serwera</label>
-              <input class="m-input" type="number" id="fPort" min="1024" max="65535">
-            </div>
-            <div class="m-field">
-              <span class="m-label">Klawiatura</span>
-              <div class="m-small" id="kbStatus">Sprawdzanie…</div>
-            </div>
-          </div>
-          <label class="check"><input type="checkbox" id="fApproval2"> Pytaj o zgodę przy nowym urządzeniu</label>
-          <label class="check"><input type="checkbox" id="fClock"> Pokazuj zegar na pasku telefonu</label>
-          <div class="m-field">
-            <span class="m-label">Kopia zapasowa</span>
-            <div class="row-btns">
-              <button class="m-btn small" id="btnExport">Eksportuj deck…</button>
-              <button class="m-btn small" id="btnImport">Importuj deck…</button>
-            </div>
-          </div>
-        </div>
-        <div data-spane="plugins" hidden>
-          <div class="row-btns spaced">
-            <div class="m-small">Wtyczki dodają akcje i zmienne. Własne wtyczki wrzuć do folderu wtyczek (każda w swoim folderze z plikiem index.js).</div>
-            <button class="m-btn small" id="btnPluginsDir">Folder wtyczek</button>
-          </div>
-          <div class="plugins" id="pluginsList"></div>
-        </div>
-        <div data-spane="vars" hidden>
-          <div class="row-btns">
-            <input class="m-input" id="newVarName" placeholder="Nazwa nowej zmiennej, np. licznik">
-            <button class="m-btn small accent" id="btnNewVar">Dodaj</button>
-          </div>
-          <div class="var-list" id="varsList"></div>
-        </div>
-        <div data-spane="about" hidden>
-          <div class="m-about">
-            <img src="../build/icons/128x128.png" alt="">
-            <div>
-              <div class="m-about-name">Pitaya Deck</div>
-              <div class="m-about-desc">Twój telefon jako panel przycisków do komputera</div>
-              <div class="m-small">Wersja: <span id="appVersionText">—</span></div>
-            </div>
-          </div>
-          <div class="m-update-card">
-            <div class="m-update-head">
-              <div>
-                <div class="m-update-title">Aktualizacje z GitHub</div>
-                <div class="m-update-status" id="updateStatusText">Sprawdź, czy jest nowsza wersja w repozytorium</div>
-              </div>
-              <button class="m-btn small" id="btnCheckUpdate">Sprawdź</button>
-            </div>
-            <div class="m-update-details" id="updateDetails">
-              <div id="updateInfo"></div>
-              <div style="display:flex; gap:8px;">
-                <button class="m-btn small success" id="btnApplyUpdate">Zainstaluj aktualizację</button>
-                <button class="m-btn small accent" id="btnRestartApp" style="display:none;">Uruchom ponownie</button>
-              </div>
-            </div>
-          </div>
-          <div class="m-field">
-            <span class="m-label">Folder danych (Pitaya Core)</span>
-            <div class="data-row"><code id="dataDirText">—</code><button class="m-btn small" id="btnOpenDataDir">Otwórz</button></div>
-          </div>
-          <div class="m-small">Ikony: <a class="m-link" href="#" onclick="return false">Lucide</a> (licencja ISC, © Lucide Icons and Contributors).</div>
-          <div class="m-small">Repozytorium: <a class="m-link" id="repoLink" href="#">github.com/MangoLabz/Pitayas-Deck</a></div>
-          <button class="m-btn small danger" id="btnQuit">Zakończ Pitaya Deck</button>
-        </div>
-      </div>
-    </div>
-  </div>
+  <div class="ctx-menu" id="ctxMenu" hidden></div>
 
   <script src="../shared/render.js"></script>
   <script src="../core/ui/pitaya-ui.js"></script>
-  <script src="editor.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/fields.js"></script>
+  <script src="js/blocks.js"></script>
+  <script src="js/deck-page.js"></script>
+  <script src="js/widget-editor.js"></script>
+  <script src="js/pages.js"></script>
 </body>
 </html>

@@ -44,3 +44,4 @@ body.fullscreen .grid-wrap { padding-top: 12px; }
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 .toast.error { background: #5a1f2a; }
+.grid-wrap { min-width: 0; width: 100%; overflow: hidden; }

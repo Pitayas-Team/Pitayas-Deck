@@ -16,6 +16,7 @@ const { createServer } = require('./deck/server');
 const { createPlatform } = require('./deck/platform');
 const { importMacroDeck, macroDeckDir } = require('./deck/import-macrodeck');
 const { createPluginStore } = require('./deck/plugin-store');
+const { createAutomations } = require('./deck/automations');
 
 const ICON = path.join(__dirname, 'build', 'icons', '512x512.png');
 const log = (...a) => core.log.info(...a);
@@ -60,8 +61,11 @@ function usedPlugins() {
         }
     };
     for (const f of Object.values(store.deck.folders)) for (const btn of Object.values(f.buttons || {})) for (const list of Object.values(btn.actions || {})) walk(list);
+    for (const sc of store.deck.scripts || []) walk(sc.blocks);
+    for (const a of store.deck.automations || []) walk(a.blocks);
     return [...ids];
 }
+const automations = createAutomations({ store, runtime, log });
 const server = createServer({
     store,
     runtime,
@@ -172,6 +176,7 @@ if (core.singleInstance(showWindow)) {
         await startServer();
         // Dodatki ze sklepu potrzebne przyciskom (np. Spotify po przeniesieniu do sklepu) instalują się same
         const added = await pluginStore.ensure(usedPlugins()).catch(() => []);
+        automations.start();
         toEditor('deck:ready');
         if (added.length) toEditor('deck:notify', `Zainstalowano ze sklepu dodatki używane przez Twoje przyciski: ${added.join(', ')}`, 'success');
     });
@@ -260,6 +265,11 @@ ipcMain.handle('deck:store-uninstall', async (e, id) => {
 ipcMain.handle('deck:store-update-all', async () => ({ updated: await pluginStore.updateAll(), plugins: runtime.describe() }));
 ipcMain.handle('deck:store-used', () => usedPlugins());
 ipcMain.handle('deck:store-url', (e, url) => { store.setSettings({ storeUrl: String(url || '').trim() }); return pluginStore.list(true); });
+// ───── Skrypty i automatyzacje ─────
+ipcMain.handle('deck:images', () => { try { return fs.readdirSync(store.imagesDir).filter((n) => /\.(png|jpe?g|webp|gif|svg)$/i.test(n)).sort(); } catch { return []; } });
+ipcMain.handle('deck:scripts-set', (e, list) => store.setScripts(list));
+ipcMain.handle('deck:automations-set', (e, list) => store.setAutomations(list));
+ipcMain.handle('deck:automation-run', async (e, id) => { await automations.run(id); return true; });
 ipcMain.handle('deck:open-plugins-dir', () => {
     const dir = path.join(core.paths.data, 'plugins');
     fs.mkdirSync(dir, { recursive: true });

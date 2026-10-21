@@ -98,6 +98,7 @@
         grid.style.gridTemplateColumns = `repeat(${cols}, ${cell}px)`;
         grid.style.gridTemplateRows = `repeat(${rows}, ${cell}px)`;
         document.body.style.background = state.style.background || '';
+        grid.classList.toggle('empty-hidden', state.style.emptyCells === 'transparent');
         cellSize = cell;
         return cell;
     }
