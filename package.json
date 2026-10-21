@@ -7,7 +7,7 @@
     "name": "Pitayas",
     "email": "inbox@rakunek.com"
   },
-  "homepage": "https://github.com/MangoLabz/Pitayas-Deck",
+  "homepage": "https://github.com/Pitayas-Team/Pitayas-Deck",
   "license": "MIT",
   "scripts": {
     "start": "electron --no-sandbox .",

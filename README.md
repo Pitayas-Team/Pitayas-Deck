@@ -1,8 +1,30 @@
-<h2 align="center">Pitaya Deck</h2>
+<h2 align="center"><u>Pitaya Deck</u></h2>
 
-<p align="center"><img src="build/icons/256x256.png" width="160"></p>
 
-<p align="center">Telefon, tablet albo dowolna przeglądarka jako panel przycisków do komputera.<br>Część rodziny aplikacji <b>Pitayas</b>.</p>
+<p align="center">
+  <img src="build/icons/512x512.png" width="300">
+</p>
+<h4 align="center"> Telefon, tablet albo dowolna przeglądarka jako panel przycisków do komputera </h4>
+
+<p align="center">
+    <img src="https://img.shields.io/github/stars/Pitayas-Team/Pitayas-Deck?style=for-the-badge&color=orange">
+    <img src="https://img.shields.io/github/forks/Pitayas-Team/Pitayas-Deck?style=for-the-badge&color=purple">
+    <img src="https://img.shields.io/github/issues/Pitayas-Team/Pitayas-Deck?style=for-the-badge&color=red">
+<br>
+    <img src="https://img.shields.io/badge/Open%20Source-Yes-orange?style=flat-square">
+    <img src="https://img.shields.io/badge/Maintained-Yes-cyan?style=flat-square">
+    <img src="https://img.shields.io/badge/Made%20In-Poland (Silesia)-green?style=flat-square">
+</p>
+
+### [+] Opis
+Pitaya Deck zamienia telefon, tablet albo dowolną przeglądarkę w panel przycisków do komputera — jak Stream Deck, ale bez dodatkowego sprzętu. Część rodziny aplikacji **Pitayas**, działa na Linuxie i Windowsie.
+
+### [+] Instalacja
+Pobierz najnowszą wersję z [Releases](https://github.com/Pitayas-Team/Pitayas-Deck/releases):
+- `.rpm` — Fedora / Nobara: otwórz plik albo `sudo dnf install ./plik.rpm`
+- `.AppImage` — każdy Linux: `chmod +x` i uruchom
+
+Na telefonie nic nie instalujesz: zeskanuj kod QR z aplikacji na komputerze.
 
 ### [+] Co potrafi
 - **Bez dodatkowej aplikacji na telefonie** — zeskanuj kod QR, zatwierdź urządzenie na komputerze i gotowe. „Dodaj do ekranu głównego” otwiera deck jak aplikację na pełnym ekranie.

@@ -7,7 +7,7 @@ const core = require('./core').create({
     id: 'deck',
     folder: 'Deck',
     name: 'Pitaya Deck',
-    repo: 'MangoLabz/Pitayas-Deck',
+    repo: 'Pitayas-Team/Pitayas-Deck',
     appDir: __dirname,
 });
 const { createStore } = require('./deck/store');
