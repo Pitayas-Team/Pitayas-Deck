@@ -3,6 +3,20 @@
     const { $, esc } = PD;
     PD.optionsCache = {};
 
+    // Adresy w opisach (np. Redirect URI) jako przycisk „kliknij, żeby skopiować”
+    PD.linkify = (text) => esc(text).replace(/\b(https?:\/\/[^\s,;)<>"']+[^\s,;)<>"'.])/g, (m) => `<button type="button" class="copy-chip" data-copy="${m}" title="Kliknij, żeby skopiować">${m}${PD.icon('copy')}</button>`);
+    document.addEventListener('click', async (e) => {
+        const b = e.target.closest('[data-copy]');
+        if (!b) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const text = b.dataset.copy.replace(/&amp;/g, '&');
+        try { await deck.copyText(text); } catch { try { await navigator.clipboard.writeText(text); } catch { return PD.toast('Nie udało się skopiować', 'error'); } }
+        b.classList.add('copied');
+        setTimeout(() => b.classList.remove('copied'), 1200);
+        PD.toast(`Skopiowano: ${text}`, 'success');
+    }, true);
+
     // Pole ustawienia akcji / wtyczki
     PD.fieldHtml = (f, value) => {
         const v = value === undefined ? f.default : value;
@@ -11,7 +25,7 @@
         const help = f.help ? `<div class="f-help">${esc(f.help)}</div>` : '';
         const attrs = `id="${id}" data-key="${esc(f.key)}" data-type="${f.type}"`;
         if (f.type === 'button') return `<button class="m-btn small" data-cmd="${esc(f.key)}">${esc(f.label)}</button>${help}`;
-        if (f.type === 'info') return `<div class="plug-info">${esc(f.label)}${f.help ? `<br><span class="m-small">${esc(f.help)}</span>` : ''}</div>`;
+        if (f.type === 'info') return `<div class="plug-info">${PD.linkify(f.label)}${f.help ? `<br><span class="m-small">${PD.linkify(f.help)}</span>` : ''}</div>`;
         if (f.type === 'bool') return `<label class="toggle-row"><span>${esc(f.label)}</span><input type="checkbox" class="switch" ${attrs} ${v ? 'checked' : ''}></label>${help}`;
         if (f.type === 'textarea') return `<div class="m-field">${label}<div class="field-row"><textarea class="m-input" ${attrs} placeholder="${esc(f.placeholder || '')}">${esc(v ?? '')}</textarea><button class="m-btn small icon-only" data-insvar title="Wstaw zmienną">{ }</button></div>${help}</div>`;
         if (f.type === 'select') {
