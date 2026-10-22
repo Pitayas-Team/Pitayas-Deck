@@ -33,7 +33,7 @@ function defaultDeck() {
         },
         variables: {},
         devices: {},
-        settings: { port: 8191, requireApproval: true, showClock: true },
+        settings: { port: 8191, requireApproval: true, showClock: true, autostart: 'off' },
     };
 }
 

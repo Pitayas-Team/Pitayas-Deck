@@ -17,6 +17,7 @@ const { createPlatform } = require('./deck/platform');
 const { importMacroDeck, macroDeckDir } = require('./deck/import-macrodeck');
 const { createPluginStore } = require('./deck/plugin-store');
 const { createAutomations } = require('./deck/automations');
+const autostart = require('./deck/autostart');
 
 const ICON = path.join(__dirname, 'build', 'icons', '512x512.png');
 const log = (...a) => core.log.info(...a);
@@ -111,8 +112,9 @@ function showWindow() {
     win.focus();
 }
 
-function createWindow() {
+function createWindow(hidden = false) {
     win = new BrowserWindow({
+        show: !hidden,
         width: 1320,
         height: 840,
         minWidth: 1040,
@@ -175,8 +177,10 @@ if (core.singleInstance(showWindow)) {
     core.registerIpc({ beforeRestart: async () => { isQuitting = true; store.flush(); await server.stop(); platform.dispose(); } });
     core.onQuit(quit);
     app.whenReady().then(async () => {
-        createWindow();
+        // Z autostartu „w tle”: okno wczytuje się ukryte, otwierasz je ikoną w zasobniku
+        createWindow(autostart.startedHidden());
         createTray();
+        try { autostart.apply(store.deck.settings.autostart); } catch (err) { core.log.error('Autostart:', err); }
         await runtime.startAll();
         await startServer();
         // Dodatki ze sklepu potrzebne przyciskom (np. Spotify po przeniesieniu do sklepu) instalują się same
@@ -233,6 +237,7 @@ ipcMain.handle('deck:import-macrodeck', () => importMacroDeck(store, { log }));
 
 ipcMain.handle('deck:settings', async (e, patch) => {
     const s = store.setSettings(patch);
+    if ('autostart' in patch) autostart.apply(s.autostart);
     // Zmiana portu: serwer startuje od nowa (telefony połączą się same po odświeżeniu adresu)
     if (patch.port && parseInt(patch.port, 10) !== server.port) {
         await server.stop();

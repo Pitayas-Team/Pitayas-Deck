@@ -215,6 +215,16 @@
             <label class="check"><input type="checkbox" id="fClock"> Pokazuj zegar na pasku telefonu</label>
           </div>
           <div class="card">
+            <h3>Uruchamianie</h3>
+            <div class="m-field"><label class="m-label" for="fAutostart">Przy starcie systemu</label>
+              <select class="m-input" id="fAutostart">
+                <option value="off">Nie uruchamiaj</option>
+                <option value="window">Z otwartym oknem</option>
+                <option value="background">W tle (tylko ikona w zasobniku)</option>
+              </select></div>
+            <div class="m-small">W tle Pitaya Deck od razu przyjmuje połączenia z telefonów, a okno otworzysz ikoną w zasobniku.</div>
+          </div>
+          <div class="card">
             <h3>Klawiatura</h3>
             <div class="m-small" id="kbStatus">Sprawdzanie…</div>
             <div class="m-small">Skróty i wpisywanie tekstu działają przez wirtualną klawiaturę (Linux: uinput, ydotool, xdotool albo wtype).</div>

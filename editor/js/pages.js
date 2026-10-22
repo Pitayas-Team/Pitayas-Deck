@@ -373,6 +373,7 @@
             $('fPort').value = PD.data.deck.settings.port;
             $('fApproval2').checked = PD.data.deck.settings.requireApproval;
             $('fClock').checked = PD.data.deck.settings.showClock;
+            $('fAutostart').value = PD.data.deck.settings.autostart || 'off';
             $('importCard').hidden = !(await deck.macroDeckAvailable());
             deck.keyboardStatus().then((s) => {
                 const names = { uinput: 'wirtualna klawiatura (uinput)', ydotool: 'ydotool', xdotool: 'xdotool', wtype: 'wtype', windows: 'Windows' };
@@ -383,6 +384,12 @@
     $('fPort').onchange = async () => { const res = await deck.settings({ port: parseInt($('fPort').value, 10) }); PD.data.server = res.server; PD.renderConnection(); PD.toast(`Serwer działa na porcie ${res.server.port}`, 'success'); };
     $('fApproval2').onchange = () => deck.settings({ requireApproval: $('fApproval2').checked });
     $('fClock').onchange = () => deck.settings({ showClock: $('fClock').checked });
+    $('fAutostart').onchange = async () => {
+        try {
+            await deck.settings({ autostart: $('fAutostart').value });
+            PD.toast({ off: 'Pitaya Deck nie uruchomi się przy starcie systemu', window: 'Pitaya Deck uruchomi się z oknem przy starcie systemu', background: 'Pitaya Deck uruchomi się w tle przy starcie systemu' }[$('fAutostart').value], 'success');
+        } catch (err) { PD.toast(PD.errText(err), 'error'); }
+    };
     $('btnExport').onclick = async () => { const f = await deck.exportDeck(); if (f) PD.toast(`Zapisano: ${f}`, 'success'); };
     $('btnImport').onclick = async () => {
         if (!(await PD.confirm('Importować deck?', 'Import zastąpi wszystkie profile, foldery i przyciski.', 'Importuj'))) return;
