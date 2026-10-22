@@ -539,3 +539,15 @@ body.folders-hidden .fold-title, body.folders-hidden .tree, body.folders-hidden 
 .pr-sec > b { font-size: 13px; }
 .pr-row { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 10px; background: var(--m-surface); font-size: 13px; }
 .pr-row small { margin-left: auto; color: var(--m-text-3); font-size: 12px; }
+/* Lista do zaznaczania w ustawieniach integracji */
+.checklist { display: flex; flex-direction: column; gap: 8px; }
+.cl-top { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.cl-top .cl-search { flex: 1; min-width: 160px; }
+.cl-list { max-height: 420px; overflow-y: auto; border: 1px solid var(--m-line); border-radius: 12px; padding: 4px; background: var(--m-field); }
+.cl-group { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; padding: 8px 10px 4px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--m-text-3); background: var(--m-field); }
+.cl-group span { letter-spacing: 0; }
+.cl-item { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 9px; cursor: pointer; font-size: 13px; }
+.cl-item:hover { background: var(--m-item); }
+.cl-item input { accent-color: var(--m-accent); width: 16px; height: 16px; flex-shrink: 0; }
+.cl-item span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-item small { color: var(--m-text-3); font-family: 'JetBrains Mono', monospace; font-size: 11px; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

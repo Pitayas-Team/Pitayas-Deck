@@ -32,7 +32,11 @@ const runtime = createRuntime({
     store,
     userPluginsDir: path.join(core.paths.data, 'plugins'),
     log,
-    notify: (text, kind) => toEditor('deck:notify', text, kind),
+    notify: (text, kind, device) => {
+        toEditor('deck:notify', text, kind);
+        // Komunikaty po naciśnięciu przycisku pokazujemy też na telefonie / tablecie, który go nacisnął
+        try { if (device && device !== 'editor' && device !== 'deck') server.deckApi.toast(device, text, kind); } catch {}
+    },
     services: {
         platform,
         getPort: () => (server ? server.port : 0),

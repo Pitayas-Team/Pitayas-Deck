@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-22T16:22:20.402Z",
+  "generatedAt": "2026-10-22T18:58:56.805Z",
   "plugins": [
     {
       "id": "discord",
@@ -54,7 +54,7 @@
     {
       "id": "home-assistant",
       "name": "Home Assistant",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "author": "Pitayas",
       "license": "MIT",
       "icon": "house",
@@ -63,11 +63,14 @@
       "description": "Światła, gniazdka, sceny i skrypty z Home Assistanta.",
       "longDescription": "Łączy się z Twoim Home Assistantem przez token długoterminowy. Wybierasz urządzenia z listy, a ich stan (np. czy światło świeci) może zmieniać wygląd przycisków.",
       "features": [
+        "Samo wykrywa urządzenia po wpisaniu adresu i tokenu",
+        "Wybór, które urządzenia mają być dostępne",
         "Włącz / wyłącz / przełącz urządzenie",
-        "Jasność światła (także suwakiem)",
-        "Sceny, skrypty i automatyzacje",
+        "Jasność świateł (także suwakiem)",
+        "Rolety i bramy",
+        "Sceny, skrypty, automatyzacje i przyciski",
         "Dowolna usługa z danymi JSON",
-        "Stan wybranych encji jako zmienne"
+        "Stan wybranych urządzeń jako zmienne"
       ],
       "tags": [
         "home assistant",
@@ -77,6 +80,10 @@
       ],
       "changelog": [
         {
+          "version": "1.1.0",
+          "notes": "Urządzenia wykrywają się same po wpisaniu tokenu; lista do wyboru, które mają być dostępne; akcja Roleta / brama."
+        },
+        {
           "version": "1.0.0",
           "notes": "Pierwsza wersja."
         }
@@ -84,13 +91,13 @@
       "files": [
         {
           "path": "index.js",
-          "size": 6726,
-          "sha256": "0fcab70c123ea6fd4880337181b20e295d061c26dd53699b31fe22ab4a099003"
+          "size": 11424,
+          "sha256": "d2ddb879ee4eb8d93916a92eba4b5434d4d6d35748191ceca33f6a45a13ff830"
         },
         {
           "path": "plugin.json",
-          "size": 885,
-          "sha256": "778ec76637932aeb6d71bbc585b59396c4f921c31082d8778d64c9129e812c36"
+          "size": 1215,
+          "sha256": "b151e19bb0764edc847d6888746c569e999fe9209c9a2c89ec57995dee085962"
         }
       ]
     },

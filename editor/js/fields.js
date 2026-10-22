@@ -26,6 +26,12 @@
         const attrs = `id="${id}" data-key="${esc(f.key)}" data-type="${f.type}"`;
         if (f.type === 'button') return `<button class="m-btn small" data-cmd="${esc(f.key)}">${esc(f.label)}</button>${help}`;
         if (f.type === 'info') return `<div class="plug-info">${PD.linkify(f.label)}${f.help ? `<br><span class="m-small">${PD.linkify(f.help)}</span>` : ''}</div>`;
+        // Lista do zaznaczania (np. urządzenia Home Assistanta) — ładowana z wtyczki
+        if (f.type === 'checklist') return `<div class="m-field"><span class="m-label">${esc(f.label)}</span>${help}
+            <div class="checklist" data-key="${esc(f.key)}" data-type="checklist" data-value='${esc(JSON.stringify(Array.isArray(v) ? v : []))}'>
+              <div class="cl-top"><input class="m-input cl-search" placeholder="Szukaj…"><button type="button" class="m-btn small" data-cl="all">Zaznacz widoczne</button><button type="button" class="m-btn small" data-cl="none">Odznacz widoczne</button><button type="button" class="m-btn small icon-only" data-cl="reload" title="Wczytaj ponownie">${PD.icon('refresh-cw')}</button></div>
+              <div class="cl-count m-small"></div><div class="cl-list"><div class="m-small">Wczytywanie…</div></div>
+            </div></div>`;
         if (f.type === 'bool') return `<label class="toggle-row"><span>${esc(f.label)}</span><input type="checkbox" class="switch" ${attrs} ${v ? 'checked' : ''}></label>${help}`;
         if (f.type === 'textarea') return `<div class="m-field">${label}<div class="field-row"><textarea class="m-input" ${attrs} placeholder="${esc(f.placeholder || '')}">${esc(v ?? '')}</textarea><button class="m-btn small icon-only" data-insvar title="Wstaw zmienną">{ }</button></div>${help}</div>`;
         if (f.type === 'select') {
@@ -56,8 +62,44 @@
     };
 
     // Podpina pola w kontenerze: onSet(key, value). defs = lista definicji pól (do plików)
+    // Lista do zaznaczania: opcje { value, label, group, hint } z wtyczki, wartość = tablica zaznaczonych
+    async function wireChecklist(box, pluginId, actionId, onSet) {
+        const key = box.dataset.key;
+        let opts = [];
+        let sel = new Set(JSON.parse(box.dataset.value || '[]'));
+        const list = box.querySelector('.cl-list'), search = box.querySelector('.cl-search');
+        const save = () => { box.dataset.value = JSON.stringify([...sel]); onSet(key, [...sel]); count(); };
+        const count = () => { box.querySelector('.cl-count').textContent = opts.length ? `Wybrano ${[...sel].filter((x) => opts.some((o) => o.value === x)).length} z ${opts.length}` : ''; };
+        const visible = () => { const q = search.value.trim().toLowerCase(); return opts.filter((o) => !q || `${o.label} ${o.value} ${o.group || ''}`.toLowerCase().includes(q)); };
+        const render = () => {
+            const groups = new Map();
+            for (const o of visible()) { const g = o.group || 'Inne'; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(o); }
+            list.innerHTML = [...groups.entries()].map(([g, items]) => `<div class="cl-group">${esc(g)} <span>${items.filter((o) => sel.has(o.value)).length}/${items.length}</span></div>` +
+                items.map((o) => `<label class="cl-item"><input type="checkbox" value="${esc(o.value)}" ${sel.has(o.value) ? 'checked' : ''}><span>${esc(o.label)}</span><small>${esc(o.hint || o.value)}</small></label>`).join('')).join('') ||
+                `<div class="m-small">${opts.length ? 'Nic nie pasuje.' : 'Brak pozycji — sprawdź połączenie.'}</div>`;
+            count();
+        };
+        const load = async () => {
+            list.innerHTML = '<div class="m-small">Wczytywanie…</div>';
+            opts = await deck.fieldOptions(pluginId, actionId, key).catch(() => []);
+            if (opts.length === 1 && !opts[0].value) { list.innerHTML = `<div class="m-small">${esc(opts[0].label)}</div>`; opts = []; return; }
+            render();
+        };
+        list.addEventListener('change', (e) => { const c = e.target; if (!c.matches('input[type=checkbox]')) return; if (c.checked) sel.add(c.value); else sel.delete(c.value); save(); render(); });
+        search.addEventListener('input', render);
+        box.querySelector('.cl-top').addEventListener('click', (e) => {
+            const b = e.target.closest('[data-cl]');
+            if (!b) return;
+            if (b.dataset.cl === 'reload') return load();
+            for (const o of visible()) { if (b.dataset.cl === 'all') sel.add(o.value); else sel.delete(o.value); }
+            save(); render();
+        });
+        box.reload = async (value) => { if (value) sel = new Set(value); await load(); };
+        await load();
+    }
     PD.wireFields = (root, { pluginId, actionId, defs = [], onSet }) => {
-        root.querySelectorAll('[data-key]').forEach((input) => {
+        root.querySelectorAll('.checklist[data-key]').forEach((box) => wireChecklist(box, pluginId, actionId, onSet));
+        root.querySelectorAll('[data-key]:not(.checklist)').forEach((input) => {
             const key = input.dataset.key, type = input.dataset.type;
             const read = () => (type === 'bool' ? input.checked : type === 'number' ? (input.value === '' ? '' : (isNaN(Number(input.value.replace(',', '.'))) ? input.value : Number(input.value.replace(',', '.')))) : input.value);
             input.addEventListener(type === 'bool' || input.tagName === 'SELECT' ? 'change' : 'input', (e) => { e.stopPropagation(); onSet(key, read()); });

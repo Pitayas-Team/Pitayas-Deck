@@ -203,11 +203,11 @@
         let t = null;
         const flushSettings = async () => {
             const patch = {};
-            $('intFields').querySelectorAll('[data-key]').forEach((x) => { patch[x.dataset.key] = x.dataset.type === 'bool' ? x.checked : x.dataset.type === 'number' ? Number(x.value) : x.value; });
+            $('intFields').querySelectorAll('[data-key]').forEach((x) => { patch[x.dataset.key] = x.dataset.type === 'checklist' ? JSON.parse(x.dataset.value || '[]') : x.dataset.type === 'bool' ? x.checked : x.dataset.type === 'number' ? Number(x.value) : x.value; });
             if (Object.keys(patch).length) await deck.pluginSettings(p.id, patch);
             PD.optionsCache = {};
         };
-        PD.wireFields($('intFields'), { onSet: () => { clearTimeout(t); t = setTimeout(flushSettings, 500); } });
+        PD.wireFields($('intFields'), { pluginId: p.id, actionId: '__settings', onSet: () => { clearTimeout(t); t = setTimeout(flushSettings, 500); } });
         $('intFields').querySelectorAll('[data-insvar]').forEach((b) => b.remove());
         $('intFields').querySelectorAll('[data-cmd]').forEach((btn) => btn.onclick = async () => {
             btn.disabled = true;

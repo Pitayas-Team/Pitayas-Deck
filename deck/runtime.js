@@ -107,7 +107,8 @@ function createRuntime({ store, userPluginsDir, log, notify, services = {} }) {
             },
             serverPort: () => (services.getPort ? services.getPort() : 0),
             log: (...a) => log(`[${id}]`, ...a),
-            notify: (text, type = 'info') => notify(text, type),
+            // Komunikat trafia do edytora i na urządzenie, które nacisnęło przycisk
+            notify: (text, type = 'info') => notify(text, type, extra.device),
             deck: deckApi,
             ...services,
             ...extra,
@@ -223,7 +224,7 @@ function createRuntime({ store, userPluginsDir, log, notify, services = {} }) {
             builtin: p.builtin,
             error: p.error || null,
             disabled: isDisabled(id),
-            settings: (p.def.settings || []).map(({ key, label, type, default: d, placeholder, help }) => ({ key, label, type, default: d, placeholder, help })),
+            settings: (p.def.settings || []).map(({ key, label, type, default: d, placeholder, help, options }) => ({ key, label, type, default: d, placeholder, help, dynamic: typeof options === 'function' })),
             // Tylko zadeklarowane pola — tokeny logowania zostają w procesie głównym
             values: Object.fromEntries((p.def.settings || []).filter((x) => x.type !== 'button' && x.type !== 'info').map((x) => [x.key, pluginSettings(id)[x.key]])),
             status: p.status || null,
@@ -247,7 +248,8 @@ function createRuntime({ store, userPluginsDir, log, notify, services = {} }) {
     }
     async function fieldOptions(pluginId, actionId, key) {
         const p = plugins.get(pluginId);
-        const a = p && p.def.actions.find((x) => x.id === actionId);
+        // actionId '__settings' = pole w ustawieniach wtyczki (np. lista urządzeń do wyboru)
+        const a = p && (actionId === '__settings' ? { fields: p.def.settings || [] } : p.def.actions.find((x) => x.id === actionId));
         const f = a && (a.fields || []).find((x) => x.key === key);
         if (!f || typeof f.options !== 'function') return [];
         try { return await f.options(makeCtx(pluginId)); } catch (err) { return [{ value: '', label: `Błąd: ${err.message}` }]; }
@@ -367,7 +369,7 @@ function createRuntime({ store, userPluginsDir, log, notify, services = {} }) {
     async function runActions(list, extra = {}) {
         const ctl = { stop: false, break: false, steps: 0, errors: [] };
         await runBlocks(list, extra, ctl);
-        if (ctl.errors.length) notify(ctl.errors.join(' · '), 'error');
+        if (ctl.errors.length) notify(ctl.errors.join(' · '), 'error', extra.device);
         return ctl.errors;
     }
 
