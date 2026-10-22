@@ -11,7 +11,8 @@
   "license": "MIT",
   "scripts": {
     "start": "electron --no-sandbox .",
-    "dist": "electron-builder --linux AppImage rpm"
+    "dist": "electron-builder --linux AppImage rpm",
+    "plugins-index": "node scripts/plugins-index.js"
   },
   "dependencies": {
     "qrcode": "^1.5.4",
@@ -37,6 +38,7 @@
       "package.json",
       "core/**/*",
       "deck/**/*",
+      "plugins/**/*",
       "editor/**/*",
       "client/**/*",
       "shared/**/*",

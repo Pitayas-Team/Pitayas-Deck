@@ -93,7 +93,8 @@ Dodatek do sklepu to zwykła wtyczka z dodatkowym plikiem `plugin.json` obok `in
 ```
 
 - `icon` to nazwa ikony [Lucide](https://lucide.dev/icons), `category`: `music`, `communication`, `streaming`, `smart-home`, `productivity`, `system`, `gaming`.
-- Dodatki dołączone do aplikacji leżą w `deck/store/<id>/`. Instalacja kopiuje je do `~/.config/Pitayas/Deck/data/plugins/<id>/`.
+- Oficjalne dodatki leżą w folderze [`plugins/`](../plugins) tego repozytorium. Aplikacja pobiera spis `plugins/index.json` i pliki dodatków prosto z GitHuba (każdy plik sprawdza sumą sha256) i instaluje je do `~/.config/Pitayas/Deck/data/plugins/<id>/`. Kopia folderu jest też w aplikacji, na wypadek braku internetu.
+- Po zmianie dodatku podbij `version` w jego `plugin.json` i uruchom `npm run plugins-index`.
 - Własny sklep: w oknie sklepu wpisz adres katalogu. Pod `<adres>/index.json` musi być
   `{ "plugins": [ { …plugin.json…, "package": { "url": "https://…/spotify-1.1.0.tgz", "sha256": "…" } } ] }`.
   Paczka `.tgz` zawiera folder z `plugin.json` i `index.js`; suma `sha256` jest sprawdzana przed instalacją.

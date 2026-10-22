@@ -1,13 +1,16 @@
 // ═══════ PITAYA DECK — SKLEP Z DODATKAMI ═══════
 // Katalog dodatków:
-//   • wbudowany w aplikację: deck/store/<id>/{plugin.json, index.js, …}
-//   • opcjonalnie zdalny (Ustawienia → Sklep → adres): <adres>/index.json
-//       { "version": 1, "plugins": [ { …plugin.json…, "package": { "url": "…/spotify-1.2.0.tgz", "sha256": "…" } } ] }
+//   • z GitHuba (domyślnie): folder plugins/ w repozytorium Pitayas-Team/Pitayas-Deck
+//       <adres>/index.json  { "version": 1, "plugins": [ { …plugin.json…, "files": [{ "path": "index.js", "sha256": "…" }] } ] }
+//       pliki dodatku: <adres>/<id>/<plik>  (albo paczka .tgz: "package": { "url", "sha256" })
+//   • zapas bez internetu: kopia tego samego folderu wbudowana w aplikację (plugins/<id>/)
 // Zainstalowane dodatki trafiają do ~/.config/Pitayas/Deck/data/plugins/<id>/, a ich spis do data/store.json.
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const crypto = require('crypto');
+
+const DEFAULT_STORE = 'https://raw.githubusercontent.com/Pitayas-Team/Pitayas-Deck/main/plugins';
 
 const CATEGORIES = [
     { id: 'music', name: 'Muzyka', icon: 'music' },
@@ -76,7 +79,7 @@ function copyDir(src, dest) {
 }
 
 function createPluginStore({ appDir, pluginsDir, dataDir, runtime, settings, log = () => {} }) {
-    const bundledDir = path.join(appDir, 'deck', 'store');
+    const bundledDir = path.join(appDir, 'plugins');
     const stateFile = path.join(dataDir, 'store.json');
     let remoteCache = { url: null, time: 0, plugins: [] };
 
@@ -98,14 +101,14 @@ function createPluginStore({ appDir, pluginsDir, dataDir, runtime, settings, log
         return out;
     }
     async function remote(force) {
-        const url = String((settings().storeUrl || '')).trim().replace(/\/+$/, '');
-        if (!url) return [];
+        // Puste pole = oficjalny sklep na GitHubie
+        const url = String((settings().storeUrl || '') || DEFAULT_STORE).trim().replace(/\/+$/, '');
         if (!force && remoteCache.url === url && Date.now() - remoteCache.time < 10 * 60 * 1000) return remoteCache.plugins;
         try {
-            const res = await fetch(`${url}/index.json`, { headers: { 'User-Agent': 'Pitaya-Deck' } });
+            const res = await fetch(`${url}/index.json?t=${Math.floor(Date.now() / 60000)}`, { headers: { 'User-Agent': 'Pitaya-Deck' }, signal: AbortSignal.timeout(10000) });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const idx = await res.json();
-            const plugins = (idx.plugins || []).filter((p) => p && p.id && p.package && p.package.url).map((p) => ({ ...p, source: 'remote' }));
+            const plugins = (idx.plugins || []).filter((p) => p && p.id && ((p.package && p.package.url) || Array.isArray(p.files))).map((p) => ({ ...p, source: 'remote', base: `${url}/${p.id}` }));
             remoteCache = { url, time: Date.now(), plugins };
         } catch (err) {
             log('Sklep: nie udało się pobrać katalogu', url, err.message);
@@ -119,7 +122,8 @@ function createPluginStore({ appDir, pluginsDir, dataDir, runtime, settings, log
         const map = new Map();
         for (const p of [...bundled(), ...(await remote(force))]) {
             const prev = map.get(p.id);
-            if (!prev || compareVersions(p.version, prev.version) > 0) map.set(p.id, p);
+            // Ta sama wersja: bierzemy z GitHuba (wbudowana kopia jest tylko zapasem bez internetu)
+            if (!prev || compareVersions(p.version, prev.version) > 0 || (compareVersions(p.version, prev.version) === 0 && p.source === 'remote')) map.set(p.id, p);
         }
         return map;
     }
@@ -138,6 +142,7 @@ function createPluginStore({ appDir, pluginsDir, dataDir, runtime, settings, log
             categories: CATEGORIES,
             remoteError: remoteCache.error || null,
             storeUrl: settings().storeUrl || '',
+            defaultStore: DEFAULT_STORE,
             items: [...cat.values()].map((p) => {
                 const inst = installedInfo(p.id);
                 const live = plugins.find((x) => x.id === p.id);
@@ -170,6 +175,20 @@ function createPluginStore({ appDir, pluginsDir, dataDir, runtime, settings, log
             let sha = null;
             if (p.source === 'bundled') {
                 copyDir(p.dir, tmp);
+            } else if (Array.isArray(p.files)) {
+                // Pliki prosto z folderu na GitHubie, każdy sprawdzany sumą sha256
+                for (const f of p.files) {
+                    const rel = String(f.path || '');
+                    if (!rel || rel.includes('..') || path.isAbsolute(rel)) throw new Error(`Niebezpieczna ścieżka w dodatku: ${rel}`);
+                    const res = await fetch(`${p.base}/${rel.split('/').map(encodeURIComponent).join('/')}?v=${encodeURIComponent(p.version)}`, { headers: { 'User-Agent': 'Pitaya-Deck' }, signal: AbortSignal.timeout(20000) });
+                    if (!res.ok) throw new Error(`Pobieranie ${rel} nie powiodło się (HTTP ${res.status})`);
+                    const buf = Buffer.from(await res.arrayBuffer());
+                    const fsha = crypto.createHash('sha256').update(buf).digest('hex');
+                    if (f.sha256 && f.sha256.toLowerCase() !== fsha) throw new Error(`Plik ${rel} jest uszkodzony (zła suma kontrolna)`);
+                    const out = path.join(tmp, rel);
+                    fs.mkdirSync(path.dirname(out), { recursive: true });
+                    fs.writeFileSync(out, buf);
+                }
             } else {
                 const res = await fetch(p.package.url, { headers: { 'User-Agent': 'Pitaya-Deck' } });
                 if (!res.ok) throw new Error(`Pobieranie nie powiodło się (HTTP ${res.status})`);

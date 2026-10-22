@@ -1,0 +1,275 @@
+{
+  "version": 1,
+  "generatedAt": "2026-10-22T16:22:20.402Z",
+  "plugins": [
+    {
+      "id": "discord",
+      "name": "Discord",
+      "version": "1.1.0",
+      "icon": "headphones",
+      "color": "#5865f2",
+      "category": "communication",
+      "featured": true,
+      "description": "Wyciszenie, słuchawki, głośności, kanały głosowe i tryb mówienia.",
+      "longDescription": "Łączy się z aplikacją Discord na tym komputerze przez Discord RPC i pokazuje prawdziwy stan: czy jesteś wyciszony, na jakim kanale, czy mówisz. Bez własnej aplikacji Discord działa wyciszanie przez skróty klawiszowe.",
+      "features": [
+        "Wycisz mikrofon / wyłącz dźwięk",
+        "Głośność mikrofonu i dźwięku",
+        "Naciśnij, aby mówić / aktywność głosowa",
+        "Tłumienie szumów, usuwanie echa",
+        "Dołącz do kanału / rozłącz",
+        "Zmienne: wyciszony, kanał, serwer, mówisz, ping"
+      ],
+      "tags": [
+        "discord",
+        "głos",
+        "mikrofon",
+        "czat"
+      ],
+      "changelog": [
+        {
+          "version": "1.1.0",
+          "notes": "Dodatek przeniesiony do sklepu."
+        },
+        {
+          "version": "1.0.0",
+          "notes": "Pierwsza wersja z Discord RPC."
+        }
+      ],
+      "author": "Pitayas",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "index.js",
+          "size": 20138,
+          "sha256": "f522a3bf22ae487936c88cc66e3fe88bf1b9b4daf15d91dfb64917366a2cfb05"
+        },
+        {
+          "path": "plugin.json",
+          "size": 1110,
+          "sha256": "823bb9359208b0ac38c38ed6339c3beb950129a342a9806eb4194ebd1647d19d"
+        }
+      ]
+    },
+    {
+      "id": "home-assistant",
+      "name": "Home Assistant",
+      "version": "1.0.0",
+      "author": "Pitayas",
+      "license": "MIT",
+      "icon": "house",
+      "color": "#18bcf2",
+      "category": "smart-home",
+      "description": "Światła, gniazdka, sceny i skrypty z Home Assistanta.",
+      "longDescription": "Łączy się z Twoim Home Assistantem przez token długoterminowy. Wybierasz urządzenia z listy, a ich stan (np. czy światło świeci) może zmieniać wygląd przycisków.",
+      "features": [
+        "Włącz / wyłącz / przełącz urządzenie",
+        "Jasność światła (także suwakiem)",
+        "Sceny, skrypty i automatyzacje",
+        "Dowolna usługa z danymi JSON",
+        "Stan wybranych encji jako zmienne"
+      ],
+      "tags": [
+        "home assistant",
+        "światło",
+        "inteligentny dom",
+        "gniazdko"
+      ],
+      "changelog": [
+        {
+          "version": "1.0.0",
+          "notes": "Pierwsza wersja."
+        }
+      ],
+      "files": [
+        {
+          "path": "index.js",
+          "size": 6726,
+          "sha256": "0fcab70c123ea6fd4880337181b20e295d061c26dd53699b31fe22ab4a099003"
+        },
+        {
+          "path": "plugin.json",
+          "size": 885,
+          "sha256": "778ec76637932aeb6d71bbc585b59396c4f921c31082d8778d64c9129e812c36"
+        }
+      ]
+    },
+    {
+      "id": "obs",
+      "name": "OBS Studio",
+      "version": "1.1.0",
+      "icon": "clapperboard",
+      "color": "#7c5cff",
+      "category": "streaming",
+      "featured": true,
+      "description": "Sceny, transmisja, nagrywanie, powtórki, źródła i wirtualna kamera.",
+      "longDescription": "Steruje OBS Studio przez wbudowany w OBS serwer WebSocket (od wersji 28). Przyciski mogą świecić, gdy trwa nagrywanie albo transmisja.",
+      "features": [
+        "Przełącz scenę",
+        "Start / stop transmisji i nagrywania",
+        "Zapisz powtórkę",
+        "Wycisz źródło dźwięku",
+        "Pokaż / ukryj źródło",
+        "Wirtualna kamera"
+      ],
+      "tags": [
+        "obs",
+        "stream",
+        "nagrywanie",
+        "sceny"
+      ],
+      "changelog": [
+        {
+          "version": "1.1.0",
+          "notes": "Dodatek przeniesiony do sklepu."
+        }
+      ],
+      "author": "Pitayas",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "index.js",
+          "size": 9869,
+          "sha256": "6a36218ffaaf3e72afa83b5043f5af7ceb37c298e89f3626d20a763aec7031e5"
+        },
+        {
+          "path": "plugin.json",
+          "size": 840,
+          "sha256": "961153d9f429c02e43c51fbef76f872880bf2b08210410e4d12982aeee307f95"
+        }
+      ]
+    },
+    {
+      "id": "spotify",
+      "name": "Spotify",
+      "version": "1.1.0",
+      "icon": "music",
+      "color": "#1db954",
+      "category": "music",
+      "featured": true,
+      "description": "Odtwarzanie, playlisty, polubienia, losowo, powtarzanie, głośność i urządzenia.",
+      "longDescription": "Steruje Spotify na tym komputerze od razu, bez logowania. Po zalogowaniu własną aplikacją Spotify (bez podawania hasła w decku) dochodzą polubienia, lista Twoich playlist, przełączanie na telefon lub głośnik i statystyki słuchania.",
+      "features": [
+        "Graj / pauza, następny, poprzedni",
+        "Odtwórz playlistę z listy albo z linku",
+        "Polub utwór",
+        "Losowo i powtarzanie",
+        "Głośność Spotify (także suwakiem)",
+        "Przełącz urządzenie",
+        "Top utwory i wykonawcy jako zmienne"
+      ],
+      "tags": [
+        "muzyka",
+        "spotify",
+        "playlista",
+        "odtwarzacz"
+      ],
+      "changelog": [
+        {
+          "version": "1.1.0",
+          "notes": "Dodatek przeniesiony do sklepu. Playlisty podane samym identyfikatorem (z Macro Deck) działają."
+        },
+        {
+          "version": "1.0.0",
+          "notes": "Pierwsza wersja: Web API z logowaniem PKCE i sterowanie lokalne."
+        }
+      ],
+      "author": "Pitayas",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "index.js",
+          "size": 27348,
+          "sha256": "8623a6c1367a75ab1a2f08180cf4dde5bda406254ee8e704e929c830b6caaf11"
+        },
+        {
+          "path": "plugin.json",
+          "size": 1215,
+          "sha256": "58d8494fed1ee27d5177d165459027a9c8781190c898b04d7b1ddeda17b17719"
+        }
+      ]
+    },
+    {
+      "id": "timer",
+      "name": "Minutnik",
+      "version": "1.0.0",
+      "author": "Pitayas",
+      "license": "MIT",
+      "icon": "timer",
+      "color": "#f59e0b",
+      "category": "productivity",
+      "description": "Odliczanie, stoper i pomodoro na przyciskach.",
+      "longDescription": "Ustaw przycisk na 5 minut odliczania, uruchom stoper albo pracuj w rytmie pomodoro. Pozostały czas pokażesz na przycisku zmienną {timer.remaining}.",
+      "features": [
+        "Odliczanie z pauzą i dodawaniem czasu",
+        "Stoper z międzyczasem",
+        "Pomodoro z przerwami",
+        "Powiadomienie i dźwięk po zakończeniu"
+      ],
+      "tags": [
+        "minutnik",
+        "stoper",
+        "pomodoro",
+        "czas"
+      ],
+      "changelog": [
+        {
+          "version": "1.0.0",
+          "notes": "Pierwsza wersja."
+        }
+      ],
+      "files": [
+        {
+          "path": "index.js",
+          "size": 6858,
+          "sha256": "9c45007cf7a825dd8c5aa29f727ef8d72ae05e2676698797a9e9877480ccb1fa"
+        },
+        {
+          "path": "plugin.json",
+          "size": 758,
+          "sha256": "ae79350f71e2b8dd45d25ea26ee2a91e56a7f01135541a3ece0f850e81d1bb47"
+        }
+      ]
+    },
+    {
+      "id": "weather",
+      "name": "Pogoda",
+      "version": "1.1.0",
+      "icon": "cloud-sun",
+      "color": "#38bdf8",
+      "category": "productivity",
+      "description": "Temperatura i prognoza dla Twojego miasta (Open-Meteo, bez klucza).",
+      "longDescription": "Pobiera pogodę z darmowego serwisu Open-Meteo. Wpisz miasto w ustawieniach i użyj zmiennych na przyciskach, np. {weather.temp}°.",
+      "features": [
+        "Temperatura, odczuwalna, min i max",
+        "Opis i ikona pogody",
+        "Wilgotność i wiatr"
+      ],
+      "tags": [
+        "pogoda",
+        "temperatura",
+        "prognoza"
+      ],
+      "changelog": [
+        {
+          "version": "1.1.0",
+          "notes": "Dodatek przeniesiony do sklepu."
+        }
+      ],
+      "author": "Pitayas",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "index.js",
+          "size": 4192,
+          "sha256": "75b65ae268a7bbe95b0e36ed0881b0c630ca862e60af46e598713aa32aaf5b08"
+        },
+        {
+          "path": "plugin.json",
+          "size": 716,
+          "sha256": "bd9372f5c8078b8ba35088108aac734bf5342f33b669256ddfb4d0bb676d8c36"
+        }
+      ]
+    }
+  ]
+}

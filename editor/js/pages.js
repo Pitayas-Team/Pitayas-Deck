@@ -270,6 +270,7 @@
         $('storeCats').innerHTML = chips.map(([id, name, n]) => `<button data-cat="${id}" class="${id === storeCat ? 'active' : ''}">${esc(name)} <i>${n}</i></button>`).join('');
         $('btnStoreUpdateAll').hidden = !count((x) => x.update);
         $('storeUrlInput').value = storeData.storeUrl || '';
+        $('storeUrlInput').placeholder = `Domyślnie: ${storeData.defaultStore || 'GitHub'}`;
         $('storeUrlErr').textContent = storeData.remoteError ? `Nie udało się wczytać: ${storeData.remoteError}` : '';
         const q = $('storeSearch').value.trim().toLowerCase();
         const shown = items.filter((x) => (storeCat === 'all' || (storeCat === 'installed' && x.installed) || (storeCat === 'updates' && x.update) || x.category === storeCat) && (!q || `${x.name} ${x.description} ${(x.tags || []).join(' ')} ${x.author}`.toLowerCase().includes(q)));
@@ -297,7 +298,7 @@
                 ${(it.features || []).length ? `<div class="card"><h3>Co dodaje</h3><ul>${it.features.map((f) => `<li>${esc(f)}</li>`).join('')}</ul></div>` : ''}
                 ${it.status ? `<div class="card"><h3>Stan</h3><p>${esc(it.status.text)}</p></div>` : ''}
               </div><div>
-                <div class="card"><h3>Informacje</h3><dl><dt>Wersja</dt><dd>${esc(it.version)}${it.installed && it.installedVersion !== it.version ? ` (masz ${esc(it.installedVersion)})` : ''}</dd><dt>Autor</dt><dd>${esc(it.author || '—')}</dd><dt>Licencja</dt><dd>${esc(it.license || '—')}</dd><dt>Źródło</dt><dd>${it.source === 'remote' ? 'sklep internetowy' : 'w zestawie z Pitaya Deck'}</dd></dl></div>
+                <div class="card"><h3>Informacje</h3><dl><dt>Wersja</dt><dd>${esc(it.version)}${it.installed && it.installedVersion !== it.version ? ` (masz ${esc(it.installedVersion)})` : ''}</dd><dt>Autor</dt><dd>${esc(it.author || '—')}</dd><dt>Licencja</dt><dd>${esc(it.license || '—')}</dd><dt>Źródło</dt><dd>${it.source === 'remote' ? 'GitHub (Pitayas-Team)' : 'kopia w aplikacji (bez internetu)'}</dd></dl></div>
                 ${(it.changelog || []).length ? `<div class="card"><h3>Historia zmian</h3>${it.changelog.map((c) => `<div class="sd-log"><b>${esc(c.version)}</b> ${esc(c.notes)}</div>`).join('')}</div>` : ''}
               </div></div>`;
         PD.fillIcons($('storeDetail'));
