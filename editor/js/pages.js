@@ -117,7 +117,7 @@
         $('varTitle').textContent = varCat === 'all' ? 'Wszystkie zmienne' : PD.groupName(varCat);
         $('varCount').textContent = `Liczba zmiennych: ${list.length}`;
         $('varList').innerHTML = list.map((v) => v.plugin === 'user'
-            ? `<div class="var-row" data-var="${esc(v.name)}"><div class="vr-main"><code>{${esc(v.name)}}</code><div class="vr-tags"><span class="vt ${PD.typeOf(v)[0]}">${PD.typeOf(v)[1]}</span><span class="vt src">Twoja</span></div></div><input class="m-input vr-edit" data-edit value="${esc(v.value)}"><button class="tool" data-del title="Usuń">${PD.icon('trash-2')}</button></div>`
+            ? `<div class="var-row" data-var="${esc(v.name)}"><div class="vr-main"><div class="vr-title">${esc(v.label || v.name)}</div><div class="vr-tags"><span class="vt ${PD.typeOf(v)[0]}">${PD.typeOf(v)[1]}</span><span class="vt src">Twoja</span><code>{${esc(v.name)}}</code></div></div><input class="m-input vr-edit" data-edit value="${esc(v.value)}"><button class="tool" data-del title="Usuń">${PD.icon('trash-2')}</button></div>`
             : PD.varRow(v, false)).join('') || '<div class="empty-note">Brak zmiennych.</div>';
         PD.fillIcons($('page-variables'));
     }

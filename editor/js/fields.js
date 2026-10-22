@@ -305,11 +305,17 @@
     };
     PD.groupName = (key) => (key === 'user' ? 'Twoje zmienne' : (PD.plugin(key) || {}).name || key);
     PD.typeOf = (v) => (typeof v.value === 'boolean' ? ['bool', 'Logiczna'] : typeof v.value === 'number' ? ['num', 'Liczbowa'] : ['text', 'Tekst']);
+    PD.varValHtml = (v) => {
+        if (typeof v.value === 'boolean') return `<span class="vr-val ${v.value ? 'on' : 'off'}">${v.value ? 'Włączone' : 'Wyłączone'}</span>`;
+        const t = String(v.text ?? v.value ?? '');
+        return t === '' ? '<span class="vr-val empty">puste</span>' : `<span class="vr-val" title="${esc(t)}">${esc(t)}</span>`;
+    };
     PD.varRow = (v, clickable) => {
         const [t, tl] = PD.typeOf(v);
+        const src = v.plugin === 'user' ? 'Twoja' : PD.groupName(v.plugin || 'other');
         return `<div class="var-row${clickable ? ' clickable' : ''}" data-var="${esc(v.name)}">
-            <div class="vr-main"><code>{${esc(v.name)}}</code><div class="vr-tags"><span class="vt ${t}">${tl}</span><span class="vt src">${v.plugin === 'user' ? 'Twoja' : 'Integracja'}</span><span class="vr-label">${esc(v.label)}</span></div></div>
-            <span class="vr-val">${esc(v.text)}</span></div>`;
+            <div class="vr-main"><div class="vr-title">${esc(v.label || v.name)}</div><div class="vr-tags"><span class="vt ${t}">${tl}</span><span class="vt src">${esc(src)}</span><code>{${esc(v.name)}}</code></div></div>
+            ${PD.varValHtml(v)}</div>`;
     };
     function renderVarPicker() {
         const all = PD.data.variables || [];
