@@ -532,3 +532,10 @@ body.folders-hidden .fold-title, body.folders-hidden .tree, body.folders-hidden 
 .copy-chip:hover { border-color: var(--m-blue); background: rgba(78,168,255,.2); }
 .copy-chip .ico { width: 13px; height: 13px; color: var(--m-blue); flex-shrink: 0; }
 .copy-chip.copied { border-color: var(--m-leaf); background: rgba(76,195,138,.18); }
+.cover-badge { position: absolute; top: 5px; left: 5px; z-index: 5; height: 20px; padding: 0 6px; border-radius: 6px; display: flex; align-items: center; gap: 3px; background: rgba(255,93,115,.85); color: #fff; font-size: 11px; font-weight: 800; pointer-events: none; }
+.cover-badge .ico { width: 12px; height: 12px; }
+.pin-report { display: flex; flex-direction: column; gap: 14px; }
+.pr-sec { display: flex; flex-direction: column; gap: 6px; }
+.pr-sec > b { font-size: 13px; }
+.pr-row { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 10px; background: var(--m-surface); font-size: 13px; }
+.pr-row small { margin-left: auto; color: var(--m-text-3); font-size: 12px; }

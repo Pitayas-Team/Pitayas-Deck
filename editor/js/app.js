@@ -83,6 +83,36 @@
         el.querySelector('[data-r="0"]').onclick = () => { el.remove(); resolve(false); };
     });
 
+    // Po przypięciu: raport, gdzie widżet coś zasłoni albo się nie zmieści (i propozycja przeniesienia)
+    PD.pinFlow = async (folderId, key) => {
+        const r = await deck.pinReport(folderId, key);
+        const pos = (k) => { const [x, y] = k.split(',').map(Number); return `kolumna ${x + 1}, wiersz ${y + 1}`; };
+        if (!r.covers.length && !r.tooSmall.length && !r.blockedBy.length) return PD.toast(`Przypięto — widżet jest teraz w ${r.folders + 1} folderach profilu`, 'success');
+        const el = document.createElement('div');
+        el.className = 'm-modal-overlay active';
+        el.innerHTML = `<div class="m-modal"><div class="m-modal-header"><span class="m-modal-title">Przypięto — ale są miejsca z kolizją</span></div>
+            <div class="m-modal-body pin-report">
+              ${r.covers.length ? `<div class="pr-sec"><b>Zasłoni widżety (${r.covers.length})</b>${r.covers.map((c) => `<div class="pr-row">${PD.icon('folder')}<span>${esc(c.folder)}</span><small>„${esc(c.label)}” · ${pos(c.key)}</small></div>`).join('')}</div>` : ''}
+              ${r.tooSmall.length ? `<div class="pr-sec"><b>Nie zmieści się — za mała siatka (${r.tooSmall.length})</b>${r.tooSmall.map((c) => `<div class="pr-row">${PD.icon('grid-3x3')}<span>${esc(c.folder)}</span><small>siatka ${esc(c.grid)}</small></div>`).join('')}</div>` : ''}
+              ${r.blockedBy.length ? `<div class="pr-sec"><b>Zajęte przez inny przypięty widżet (${r.blockedBy.length})</b>${r.blockedBy.map((c) => `<div class="pr-row">${PD.icon('pin')}<span>${esc(c.folder)}</span><small>„${esc(c.label)}” z folderu ${esc(c.from)}</small></div>`).join('')}</div>` : ''}
+            </div>
+            <div class="m-modal-footer">${r.covers.length ? '<button class="m-btn small accent" data-r="move">Przenieś zasłonięte w wolne miejsca</button>' : ''}<button class="m-btn small" data-r="ok">OK</button></div></div>`;
+        document.body.appendChild(el);
+        PD.fillIcons(el);
+        await new Promise((resolve) => el.addEventListener('click', async (e) => {
+            const b = e.target.closest('[data-r]');
+            if (!b) return;
+            if (b.dataset.r === 'move') {
+                const res = await deck.pinRelocate(folderId, key);
+                PD.toast(`Przeniesiono: ${res.moved.length}${res.failed.length ? ` · brak miejsca w: ${res.failed.map((f) => f.folder).join(', ')}` : ''}`, res.failed.length ? 'error' : 'success');
+            }
+            el.remove();
+            resolve();
+        }));
+        await PD.reload();
+        if (PD.page === 'deck' && PD.renderGrid) PD.renderGrid();
+    };
+
     // Menu kontekstowe w miejscu kliknięcia: items = [[id, etykieta, ikona, klasa]] albo null (separator)
     PD.menu = (x, y, items, onPick) => {
         const m = $('ctxMenu');

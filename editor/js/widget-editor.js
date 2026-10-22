@@ -251,7 +251,11 @@
             PD.saveLast({ page: 'widget', arg: { folderId, key } });
             renderAll();
         };
-        $('lkPin').onchange = () => { update((x) => { if ($('lkPin').checked) x.pinned = true; else delete x.pinned; }); PD.toast($('lkPin').checked ? 'Przypięto — widżet pokaże się w każdym folderze profilu (gdzie to pole jest wolne)' : 'Odpięto'); };
+        $('lkPin').onchange = async () => {
+            update((x) => { if ($('lkPin').checked) x.pinned = true; else delete x.pinned; });
+            await flush();
+            if ($('lkPin').checked) PD.pinFlow(folderId, key); else PD.toast('Odpięto');
+        };
         $('lkW').onchange = resize; $('lkH').onchange = resize;
         // Stan
         segHandler('stateMode', (v) => {

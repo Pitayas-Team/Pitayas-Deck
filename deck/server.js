@@ -202,31 +202,89 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
     }
 
     // ───── Przypięte widżety: widoczne w tym samym miejscu w każdym folderze profilu ─────
-    // Zwraca widżety folderu razem z przypiętymi z innych folderów: { key: { w, home, pinned } }.
-    // Własny widżet folderu zawsze wygrywa; przypięty pojawia się tylko na wolnych polach.
+    // Przypięty widżet ma pierwszeństwo: zasłania własne widżety folderu w tym miejscu (edytor o tym mówi).
+    // Zwraca { key: { w, home, pinned, covers: [{ key, label }] } }.
+    const cellsOf = (key, w) => { const [x, y] = key.split(',').map(Number); const out = []; for (let dx = 0; dx < (w.w || 1); dx++) for (let dy = 0; dy < (w.h || 1); dy++) out.push(`${x + dx},${y + dy}`); return out; };
+    const fitsGrid = (key, w, grid) => { const [x, y] = key.split(',').map(Number); return x + (w.w || 1) <= grid.cols && y + (w.h || 1) <= grid.rows; };
+    const wLabel = (w) => String(w.label || '').split('\n')[0].trim() || { slider: 'Suwak', clock: 'Zegar', gauge: 'Wskaźniki', media: 'Odtwarzacz' }[w.type] || 'Przycisk';
+    function profileFolders(folderId) {
+        const prof = store.profileOfFolder(folderId);
+        if (!prof) return [];
+        return Object.values(store.deck.folders).filter((f) => { const r = store.folderPath(f.id)[0]; return r && r.id === prof.root; });
+    }
+    // Przypięte widżety profilu w kolejności (wcześniejszy wygrywa przy kolizji dwóch przypiętych)
+    function pinnedOf(folderId) {
+        const list = [];
+        for (const f of profileFolders(folderId)) for (const [key, w] of Object.entries(f.buttons || {})) if (w.pinned) list.push({ key, w, home: f.id });
+        return list;
+    }
     function effective(folderId) {
         const folder = store.folder(folderId);
-        const out = {};
-        const occ = new Set();
-        const mark = (key, w) => { const [x, y] = key.split(',').map(Number); for (let dx = 0; dx < (w.w || 1); dx++) for (let dy = 0; dy < (w.h || 1); dy++) occ.add(`${x + dx},${y + dy}`); };
-        const free = (key, w) => { const [x, y] = key.split(',').map(Number); for (let dx = 0; dx < (w.w || 1); dx++) for (let dy = 0; dy < (w.h || 1); dy++) if (occ.has(`${x + dx},${y + dy}`)) return false; return true; };
-        for (const [key, w] of Object.entries((folder && folder.buttons) || {})) { out[key] = { w, home: folderId, pinned: false }; mark(key, w); }
-        const prof = store.profileOfFolder(folderId);
-        if (!prof) return out;
         const grid = store.gridOf(folderId);
-        for (const f of Object.values(store.deck.folders)) {
-            if (f.id === folderId) continue;
-            const root = store.folderPath(f.id)[0];
-            if (!root || root.id !== prof.root) continue;
-            for (const [key, w] of Object.entries(f.buttons || {})) {
-                if (!w.pinned || out[key]) continue;
-                const [x, y] = key.split(',').map(Number);
-                if (x + (w.w || 1) > grid.cols || y + (w.h || 1) > grid.rows || !free(key, w)) continue;
-                out[key] = { w, home: f.id, pinned: true };
-                mark(key, w);
-            }
+        const out = {};
+        const taken = new Map();   // pole → klucz przypiętego
+        for (const p of pinnedOf(folderId)) {
+            if (!fitsGrid(p.key, p.w, grid)) continue;
+            const cells = cellsOf(p.key, p.w);
+            if (cells.some((c) => taken.has(c))) continue;
+            cells.forEach((c) => taken.set(c, p.key));
+            out[p.key] = { w: p.w, home: p.home, pinned: p.home !== folderId, covers: [] };
+        }
+        for (const [key, w] of Object.entries((folder && folder.buttons) || {})) {
+            if (w.pinned && out[key] && out[key].home === folderId) continue;   // własny przypięty już jest
+            const hit = cellsOf(key, w).map((c) => taken.get(c)).find(Boolean);
+            if (hit) { out[hit].covers.push({ key, label: wLabel(w) }); continue; }
+            out[key] = { w, home: folderId, pinned: false, covers: [] };
         }
         return out;
+    }
+    // Gdzie przypięty widżet nie pokaże się albo coś zasłoni (dla edytora)
+    function pinReport(homeId, key) {
+        const home = store.folder(homeId);
+        const w = home && home.buttons[key];
+        if (!w) return { folders: 0, covers: [], tooSmall: [], blockedBy: [] };
+        const res = { folders: 0, covers: [], tooSmall: [], blockedBy: [] };
+        const cells = cellsOf(key, w);
+        // Przypięte wcześniej (pierwszy wygrywa przy kolizji dwóch przypiętych)
+        const all = pinnedOf(homeId);
+        const mine = all.findIndex((p) => p.home === homeId && p.key === key);
+        const earlier = mine >= 0 ? all.slice(0, mine) : all;
+        for (const f of profileFolders(homeId)) {
+            if (f.id === homeId) continue;
+            res.folders++;
+            const grid = store.gridOf(f.id);
+            if (!fitsGrid(key, w, grid)) { res.tooSmall.push({ folder: f.name, folderId: f.id, grid: `${grid.cols}×${grid.rows}` }); continue; }
+            const other = earlier.find((p) => p.home !== f.id && fitsGrid(p.key, p.w, grid) && cellsOf(p.key, p.w).some((c) => cells.includes(c)));
+            if (other) { res.blockedBy.push({ folder: f.name, label: wLabel(other.w), from: (store.folder(other.home) || {}).name }); continue; }
+            for (const [k, ow] of Object.entries(f.buttons || {})) {
+                if (ow.pinned) continue;
+                if (cellsOf(k, ow).some((c) => cells.includes(c))) res.covers.push({ folder: f.name, folderId: f.id, key: k, label: wLabel(ow) });
+            }
+        }
+        return res;
+    }
+    // Przenosi widżety zasłonięte przez przypięty w pierwsze wolne miejsca ich folderów
+    function relocateCovered(homeId, key) {
+        const rep = pinReport(homeId, key);
+        const moved = [], failed = [];
+        for (const c of rep.covers) {
+            const f = store.folder(c.folderId);
+            const w = f.buttons[c.key];
+            const grid = store.gridOf(c.folderId);
+            const eff = effective(c.folderId);
+            const occ = new Set();
+            for (const [k, e] of Object.entries(eff)) cellsOf(k, e.w).forEach((x) => occ.add(x));
+            let target = null;
+            for (let y = 0; y < grid.rows && !target; y++) for (let x = 0; x < grid.cols && !target; x++) {
+                const k = `${x},${y}`;
+                if (fitsGrid(k, w, grid) && cellsOf(k, w).every((cell) => !occ.has(cell))) target = k;
+            }
+            if (!target) { failed.push(c); continue; }
+            store.setButton(c.folderId, target, w);
+            store.setButton(c.folderId, c.key, null);
+            moved.push({ ...c, to: target });
+        }
+        return { moved, failed };
     }
     const widgetAt = (folderId, key) => { const e = effective(folderId)[key]; return e ? e.w : null; };
 
@@ -239,6 +297,7 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
             buttons[key] = renderButton(e.w, e.home, key);
             if (e.pinned) buttons[key].home = e.home;   // edytor: kliknięcie otwiera widżet w jego folderze
             if (e.w.pinned) buttons[key].pinned = true;
+            if (e.covers.length) buttons[key].covers = e.covers;
         }
         const device = deviceId ? store.device(deviceId) : null;
         return {
@@ -527,7 +586,7 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
     }
 
     return {
-        start, stop, approve, deckApi, folderState, renderButton, devicesList, trigger, slider,
+        start, stop, approve, deckApi, folderState, renderButton, devicesList, trigger, slider, pinReport, relocateCovered,
         get port() { return port; },
         urls: () => localAddresses().map((a) => ({ ...a, url: `http://${a.address}:${port}` })),
         removeDevice(id) { for (const [ws] of sessionsOf(id)) ws.close(); store.removeDevice(id); emitDevices(); },

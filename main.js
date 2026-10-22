@@ -267,6 +267,8 @@ ipcMain.handle('deck:store-update-all', async () => ({ updated: await pluginStor
 ipcMain.handle('deck:store-used', () => usedPlugins());
 ipcMain.handle('deck:store-url', (e, url) => { store.setSettings({ storeUrl: String(url || '').trim() }); return pluginStore.list(true); });
 // ───── Skrypty i automatyzacje ─────
+ipcMain.handle('deck:pin-report', (e, folderId, key) => server.pinReport(folderId, key));
+ipcMain.handle('deck:pin-relocate', (e, folderId, key) => server.relocateCovered(folderId, key));
 ipcMain.handle('deck:copy-text', (e, text) => { clipboard.writeText(String(text || '')); return true; });
 ipcMain.handle('deck:images', () => { try { return fs.readdirSync(store.imagesDir).filter((n) => /\.(png|jpe?g|webp|gif|svg)$/i.test(n)).sort(); } catch { return []; } });
 ipcMain.handle('deck:scripts-set', (e, list) => store.setScripts(list));

@@ -31,6 +31,8 @@ contextBridge.exposeInMainWorld('deck', {
     setScripts: invoke('deck:scripts-set'),
     images: invoke('deck:images'),
     copyText: invoke('deck:copy-text'),
+    pinReport: invoke('deck:pin-report'),
+    pinRelocate: invoke('deck:pin-relocate'),
     setAutomations: invoke('deck:automations-set'),
     runAutomation: invoke('deck:automation-run'),
     storeInstall: invoke('deck:store-install'),
