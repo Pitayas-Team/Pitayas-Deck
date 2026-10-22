@@ -107,8 +107,8 @@ function createStore(dataDir, log = () => {}) {
             const p = deck.profiles.find((x) => x.id === id);
             if (!p) return null;
             if (patch.name !== undefined) p.name = String(patch.name).slice(0, 60) || p.name;
-            if (patch.cols !== undefined) p.cols = Math.max(1, Math.min(12, parseInt(patch.cols, 10) || p.cols));
-            if (patch.rows !== undefined) p.rows = Math.max(1, Math.min(10, parseInt(patch.rows, 10) || p.rows));
+            if (patch.cols !== undefined) p.cols = Math.max(1, Math.min(16, parseInt(patch.cols, 10) || p.cols));
+            if (patch.rows !== undefined) p.rows = Math.max(1, Math.min(12, parseInt(patch.rows, 10) || p.rows));
             // Wygląd profilu: odstęp między przyciskami (% pola), zaokrąglenie (%), tło decka
             if (patch.spacing !== undefined) p.spacing = Math.max(0, Math.min(40, parseInt(patch.spacing, 10) || 0));
             if (patch.radius !== undefined) p.radius = Math.max(0, Math.min(50, parseInt(patch.radius, 10) || 0));
@@ -122,8 +122,8 @@ function createStore(dataDir, log = () => {}) {
         folderGrid(id, cols, rows) {
             const f = deck.folders[id];
             if (!f) return null;
-            f.cols = cols ? Math.max(1, Math.min(12, parseInt(cols, 10))) : undefined;
-            f.rows = rows ? Math.max(1, Math.min(10, parseInt(rows, 10))) : undefined;
+            f.cols = cols ? Math.max(1, Math.min(16, parseInt(cols, 10))) : undefined;
+            f.rows = rows ? Math.max(1, Math.min(12, parseInt(rows, 10))) : undefined;
             changed('folders');
             return f;
         },
