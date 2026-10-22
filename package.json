@@ -1,6 +1,6 @@
 {
   "name": "pitaya-deck",
-  "version": "0.4.0-beta",
+  "version": "0.4.1-beta",
   "description": "Pitaya Deck — telefon jako panel przycisków do komputera",
   "main": "main.js",
   "author": {
@@ -70,14 +70,31 @@
     },
     "win": {
       "target": [
-        "nsis"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
-      "icon": "build/icons/512x512.png"
+      "icon": "build/icons/256x256.png",
+      "artifactName": "PitayaDeck-${version}-Setup.${ext}"
     },
     "nsis": {
-      "artifactName": "PitayaDeck-Setup-${version}.${ext}",
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Pitaya Deck",
+      "artifactName": "PitayaDeck-${version}-Setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "PitayaDeck-${version}-Portable.${ext}"
     }
   }
 }

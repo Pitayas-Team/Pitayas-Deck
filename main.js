@@ -73,6 +73,7 @@ const server = createServer({
     log,
     onEvent: (type, data) => {
         if (type === 'devices') { toEditor('deck:devices', data); updateTray(); }
+        if (type === 'editor-nav') toEditor('deck:nav', data);
         if (type === 'pairing') {
             toEditor('deck:pairing', data);
             const n = new Notification({ title: 'Pitaya Deck — nowe urządzenie', body: `${data.name} chce się połączyć. Kliknij, aby zatwierdzić.`, icon: ICON });

@@ -278,23 +278,30 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
     });
 
     // ───── API dla wtyczek (ctx.deck) ─────
+    // Tryb testu w edytorze: przyciski folderów przełączają folder w edytorze (urządzenie 'editor')
+    let editorFolder = null;
+    const editorNav = (folderId) => { editorFolder = folderId; onEvent('editor-nav', folderId); };
     const deckApi = {
         openFolder(deviceId, folderId) {
             if (!store.folder(folderId)) throw new Error('Folder nie istnieje');
+            if (deviceId === 'editor') return editorNav(folderId);
             for (const [ws, s] of sessionsOf(deviceId)) { s.folderId = folderId; pushState(ws); }
         },
         back(deviceId) {
+            if (deviceId === 'editor') { const f = store.folder(editorFolder); if (f && f.parent) editorNav(f.parent); return; }
             for (const [ws, s] of sessionsOf(deviceId)) {
                 const f = store.folder(s.folderId);
                 if (f && f.parent) { s.folderId = f.parent; pushState(ws); }
             }
         },
         home(deviceId) {
+            if (deviceId === 'editor') { const root = store.folderPath(editorFolder)[0]; if (root) editorNav(root.id); return; }
             const d = store.device(deviceId);
             for (const [ws, s] of sessionsOf(deviceId)) { s.folderId = store.profile(d && d.profile).root; pushState(ws); }
         },
         switchProfile(deviceId, profileId) {
             const p = store.profile(profileId);
+            if (deviceId === 'editor') return editorNav(p.root);
             store.upsertDevice(deviceId, { profile: p.id });
             for (const [ws, s] of sessionsOf(deviceId)) { s.folderId = p.root; pushState(ws); }
         },
@@ -340,6 +347,7 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
         const folder = store.folder(folderId);
         const w = folder && folder.buttons[key];
         if (!w) return [];
+        if (deviceId === 'editor') editorFolder = folderId;
         // Przycisk „przełączany naciśnięciem” zmienia stan przed wykonaniem akcji
         if (phase === 'press' && Array.isArray(w.states) && w.states.length > 1 && w.stateSource === 'cycle') deckApi.setState(folderId, key, 'next');
         const actions = (w.actions && w.actions[phase]) || [];

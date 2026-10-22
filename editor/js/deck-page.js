@@ -77,26 +77,68 @@
         $('gridSub').textContent = `Siatka ${cols} × ${rows}${f.cols || f.rows ? ' (własna dla folderu)' : ''}`;
     }
     PD.renderGrid = renderGrid;
-    addEventListener('resize', () => { if (PD.page === 'deck') { clearTimeout(window.__rz); window.__rz = setTimeout(renderGrid, 120); } });
+    // Siatka dopasowuje się do miejsca (okno, schowane foldery, zwinięty pasek)
+    let lastStageW = 0, lastStageH = 0;
+    new ResizeObserver(() => {
+        const r = $('stage').getBoundingClientRect();
+        if (PD.page !== 'deck' || !r.width || (Math.abs(r.width - lastStageW) < 2 && Math.abs(r.height - lastStageH) < 2)) return;
+        lastStageW = r.width; lastStageH = r.height;
+        clearTimeout(window.__rz); window.__rz = setTimeout(renderGrid, 60);
+    }).observe($('stage'));
     setInterval(() => { if (PD.page === 'deck') R.tickClocks($('grid')); }, 1000);
 
+    // Tryb testu: kliknięcie = krótkie naciśnięcie, przytrzymanie = długie naciśnięcie (jak na telefonie)
+    async function testPress(cell, trig) {
+        const key = cell.dataset.key;
+        cell.classList.add('pressing');
+        setTimeout(() => cell.classList.remove('pressing'), 180);
+        const res = await deck.testButton(PD.folderId, key, trig);
+        if (!res.ok) PD.toast(res.errors.join(' · '), 'error');
+        setTimeout(() => { if (PD.page === 'deck') renderGrid(); }, 300);
+    }
+    let holdTimer = null, held = false;
+    $('grid').addEventListener('pointerdown', (e) => {
+        if (!testMode || e.button !== 0) return;
+        const cell = e.target.closest('.cell.filled');
+        if (!cell) return;
+        held = false;
+        const b = PD.folder().buttons[cell.dataset.key];
+        if (!(b && b.actions && (b.actions.longPress || []).length)) return;
+        holdTimer = setTimeout(() => { held = true; testPress(cell, 'longPress'); }, 500);
+    });
+    addEventListener('pointerup', () => clearTimeout(holdTimer));
     $('grid').addEventListener('click', async (e) => {
         const cell = e.target.closest('.cell');
         if (!cell) return;
         const key = cell.dataset.key;
         const b = PD.folder().buttons[key];
-        if (!b) return openWidgetPicker(key);
+        if (!b) return testMode ? null : openWidgetPicker(key);
         if (testMode) {
-            const res = await deck.testButton(PD.folderId, key, 'press');
-            if (!res.ok) PD.toast(res.errors.join(' · '), 'error');
-            return setTimeout(renderGrid, 250);
+            if (held) { held = false; return; }
+            if (b.type === 'media') {
+                const m = e.target.closest('[data-media]');
+                if (m) await deck.testActions([{ plugin: 'media', action: 'media', config: { command: m.dataset.media } }]);
+                return setTimeout(renderGrid, 400);
+            }
+            if (b.type === 'slider') return PD.toast('Suwak przetestujesz na telefonie albo w edycji widżetu.');
+            return testPress(cell, 'press');
         }
         PD.go('widget', { folderId: PD.folderId, key });
+    });
+    // Przycisk folderu w trybie testu przełącza folder w edytorze
+    deck.on('nav', (fid) => {
+        if (!PD.data || !PD.data.deck.folders[fid]) return;
+        PD.folderId = fid;
+        PD.saveLast();
+        renderTree();
+        renderGrid();
     });
     $('btnTestMode').onclick = () => {
         testMode = !testMode;
         $('btnTestMode').classList.toggle('accent', testMode);
         $('btnTestMode').lastChild.textContent = testMode ? 'Tryb testu włączony' : 'Testuj klikając';
+        $('stage').classList.toggle('testing', testMode);
+        if (testMode) PD.toast('Tryb testu: kliknięcie naciska przycisk, przytrzymanie = długie naciśnięcie. Kliknij przycisk jeszcze raz, żeby wrócić do edycji.');
         renderGrid();
     };
 
@@ -364,6 +406,20 @@
         if (name) { await deck.renameFolder(fid, name); await PD.reload(); renderTree(); renderGrid(); }
     }
     $('btnFolderAdd').onclick = () => addFolder(PD.folderId);
+    // Panel folderów można schować na bok (zapamiętane)
+    function setFoldersHidden(hide) {
+        document.body.classList.toggle('folders-hidden', hide);
+        const b = $('btnFoldToggle');
+        b.title = hide ? 'Pokaż foldery' : 'Schowaj foldery';
+        b.dataset.i = hide ? 'panel-right-open' : 'panel-right-close';
+        delete b.dataset.iDone;
+        b.innerHTML = '';
+        PD.fillIcons(b.parentElement);
+        try { localStorage.setItem('pd-folders-hidden', hide ? '1' : '0'); } catch {}
+    }
+    $('btnFoldToggle').onclick = () => setFoldersHidden(!document.body.classList.contains('folders-hidden'));
+    try { if (localStorage.getItem('pd-folders-hidden') === '1') document.body.classList.add('folders-hidden'); } catch {}
+    setTimeout(() => { if (document.body.classList.contains('folders-hidden')) setFoldersHidden(true); }, 50);
 
     // ───── Strona ─────
     PD.hooks.deck = {
