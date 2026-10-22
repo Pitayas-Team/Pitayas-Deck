@@ -22,6 +22,15 @@ async function poll(ctx) {
             if (v && v.volume !== null && v.volume !== undefined) ctx.setVariable(volVar(t), v.volume);
             if (v && v.muted !== null && v.muted !== undefined) ctx.setVariable(`${volVar(t)}_muted`, v.muted);
         }
+        // Widżety odtwarzacza ustawione na konkretny odtwarzacz (np. tylko Spotify) — osobne zmienne media.pl_<odtwarzacz>_…
+        for (const pl of (ctx.deck && ctx.deck.usedMediaPlayers ? ctx.deck.usedMediaPlayers() : [])) {
+            const p = await ctx.platform.nowPlaying(pl).catch(() => null);
+            if (!p) continue;
+            const pre = `pl_${String(pl).replace(/[^\w]/g, '_')}_`;
+            ctx.setVariable(`${pre}title`, p.title); ctx.setVariable(`${pre}artist`, p.artist); ctx.setVariable(`${pre}album`, p.album);
+            ctx.setVariable(`${pre}artUrl`, p.artUrl); ctx.setVariable(`${pre}playing`, p.status === 'Playing'); ctx.setVariable(`${pre}player`, p.player || pl);
+            ctx.setVariable(`${pre}position`, p.position); ctx.setVariable(`${pre}length`, p.length);
+        }
         const np = await ctx.platform.nowPlaying(ctx.settings.player || '').catch(() => null);
         if (np) {
             ctx.setVariable('title', np.title);

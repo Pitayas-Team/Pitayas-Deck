@@ -273,6 +273,39 @@ function createPlatform({ clipboard, shell, log = () => {} }) {
     }
 
     // ───── Głośność i mikrofon ─────
+    // Windows: pomocnik PowerShell z Core Audio (deck/helpers/win-audio.ps1), działa w tle, jedno polecenie = jedna linia
+    let winAudioProc = null, winAudioBuf = '', winAudioQueue = [];
+    function winAudio(cmd) {
+        return new Promise((resolve, reject) => {
+            if (!winAudioProc) {
+                const helper = path.join(__dirname, 'helpers', 'win-audio.ps1').replace('app.asar', 'app.asar.unpacked');
+                winAudioProc = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', helper], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+                winAudioProc.stdout.setEncoding('utf8');
+                winAudioProc.stdout.on('data', (chunk) => {
+                    winAudioBuf += chunk;
+                    let nl;
+                    while ((nl = winAudioBuf.indexOf('\n')) >= 0) {
+                        const line = winAudioBuf.slice(0, nl).trim();
+                        winAudioBuf = winAudioBuf.slice(nl + 1);
+                        if (!line) continue;
+                        const job = winAudioQueue.shift();
+                        if (!job) continue;
+                        clearTimeout(job.timer);
+                        try { const r = JSON.parse(line); r.error ? job.reject(new Error(r.error)) : job.resolve(r); } catch { job.reject(new Error(`Pomocnik dźwięku: ${line}`)); }
+                    }
+                });
+                winAudioProc.stderr.on('data', (d) => log('win-audio:', String(d).trim()));
+                const fail = (msg) => { for (const j of winAudioQueue.splice(0)) { clearTimeout(j.timer); j.reject(new Error(msg)); } winAudioProc = null; winAudioBuf = ''; };
+                winAudioProc.on('exit', () => fail('Pomocnik dźwięku Windows zakończył działanie'));
+                winAudioProc.on('error', (err) => fail(err.message));
+            }
+            // Pierwsze polecenie kompiluje kod Core Audio — dajemy mu więcej czasu
+            const job = { resolve, reject, timer: setTimeout(() => { const i = winAudioQueue.indexOf(job); if (i >= 0) winAudioQueue.splice(i, 1); reject(new Error('Pomocnik dźwięku nie odpowiada')); }, 20000) };
+            winAudioQueue.push(job);
+            winAudioProc.stdin.write(`${cmd}\n`);
+        });
+    }
+    const f01 = (v) => (Math.max(0, Math.min(100, Number(v) || 0)) / 100).toFixed(3);
     const audio = which('wpctl') ? 'wpctl' : which('pactl') ? 'pactl' : isWin ? 'windows' : null;
     async function getVolume(kind = 'sink') {
         if (audio === 'wpctl') {
@@ -286,6 +319,7 @@ function createPlatform({ clipboard, shell, log = () => {} }) {
             const mu = await exec('pactl', [kind === 'sink' ? 'get-sink-mute' : 'get-source-mute', dev]);
             return { volume: parseInt((v.match(/(\d+)%/) || [])[1] || '0', 10), muted: /yes/.test(mu) };
         }
+        if (isWin) return winAudio(`get ${kind === 'sink' ? 'master' : 'mic'}`);
         return { volume: null, muted: null };
     }
     async function setVolume(mode, step = 5, value) {
@@ -304,9 +338,17 @@ function createPlatform({ clipboard, shell, log = () => {} }) {
             if (mode === 'mute') return exec('pactl', ['set-sink-mute', dev, 'toggle']);
         }
         if (isWin) {
-            if (mode === 'mute') return winKeybd([0xAD]);
-            const times = Math.max(1, Math.round(step / 2));   // jeden klawisz = 2%
-            return winKeybd(Array(times).fill(mode === 'down' ? 0xAE : 0xAF));
+            try {
+                if (mode === 'mute') return await winAudio('mute master toggle');
+                const cur = mode === 'set' ? 0 : (await winAudio('get master')).volume;
+                return await winAudio(`set master ${f01(mode === 'set' ? value : cur + (mode === 'up' ? step : -step))}`);
+            } catch (err) {
+                // Zapas: klawisze multimedialne (bez ustawiania konkretnego poziomu)
+                log('Głośność Windows przez Core Audio nie działa, używam klawiszy:', err.message);
+                if (mode === 'mute') return winKeybd([0xAD]);
+                if (mode === 'set') throw err;
+                return winKeybd(Array(Math.max(1, Math.round(step / 2))).fill(mode === 'down' ? 0xAE : 0xAF));
+            }
         }
         throw new Error('Nie znaleziono sterowania dźwiękiem (wpctl ani pactl).');
     }
@@ -314,14 +356,35 @@ function createPlatform({ clipboard, shell, log = () => {} }) {
     // Cele: system | mic | sink:<nazwa> | source:<nazwa> | app:<nazwa aplikacji> | player:<odtwarzacz MPRIS>
     const pactlJson = async (what) => { try { return JSON.parse(await exec('pactl', ['-f', 'json', 'list', what])); } catch { return []; } };
     const pct = (vol) => { const ch = vol && Object.values(vol)[0]; return ch ? parseInt(String(ch.value_percent || '0'), 10) : 0; };
-    const appName = (si) => (si.properties && (si.properties['application.name'] || si.properties['application.process.binary'])) || '';
+    const appName = (si) => (si.properties && (si.properties['application.process.binary'] || si.properties['application.name'])) || '';
+    const appLabel = (si) => (si.properties && (si.properties['application.name'] || si.properties['application.process.binary'])) || '';
+    // Programy, które zwykle grają dźwięk — pokazujemy je do wyboru, nawet gdy teraz milczą
+    const AUDIO_APPS = ['spotify', 'discord', 'Discord', 'firefox', 'chrome', 'chromium', 'brave', 'opera', 'vivaldi', 'zen', 'vlc', 'mpv', 'steam', 'obs', 'zoom', 'teams', 'telegram-desktop', 'signal-desktop', 'audacious', 'rhythmbox', 'elisa', 'strawberry', 'clementine', 'deadbeef', 'tidal-hifi', 'youtube-music'];
+    function runningAudioApps() {
+        const out = new Set();
+        if (isWin) return [];
+        try {
+            for (const pid of fs.readdirSync('/proc')) {
+                if (!/^\d+$/.test(pid)) continue;
+                let comm = '';
+                try { comm = fs.readFileSync(`/proc/${pid}/comm`, 'utf8').trim(); } catch { continue; }
+                if (AUDIO_APPS.some((a) => a.toLowerCase() === comm.toLowerCase())) out.add(comm);
+            }
+        } catch {}
+        return [...out];
+    }
     async function audioTargets() {
         const out = [{ value: 'system', label: 'Głośność systemu (domyślne wyjście)' }, { value: 'mic', label: 'Mikrofon (domyślne wejście)' }];
         if (!isWin && (audio === 'pactl' || audio === 'wpctl') && which('pactl')) {
             for (const d of await pactlJson('sinks')) out.push({ value: `sink:${d.name}`, label: `Wyjście: ${d.description && d.description !== '(null)' ? d.description : d.name}` });
             for (const d of await pactlJson('sources')) if (!/\.monitor$/.test(d.name)) out.push({ value: `source:${d.name}`, label: `Wejście: ${d.description && d.description !== '(null)' ? d.description : d.name}` });
             const apps = new Set();
-            for (const si of await pactlJson('sink-inputs')) { const n = appName(si); if (n && !apps.has(n)) { apps.add(n); out.push({ value: `app:${n}`, label: `Aplikacja: ${n}` }); } }
+            for (const si of await pactlJson('sink-inputs')) { const n = appName(si); if (n && !apps.has(n.toLowerCase())) { apps.add(n.toLowerCase()); out.push({ value: `app:${n}`, label: `Aplikacja: ${appLabel(si)}${appLabel(si).toLowerCase() !== n.toLowerCase() ? ` (${n})` : ''}` }); } }
+            for (const n of runningAudioApps()) if (!apps.has(n.toLowerCase())) { apps.add(n.toLowerCase()); out.push({ value: `app:${n}`, label: `Aplikacja: ${n} (teraz nie gra)` }); }
+        }
+        if (isWin) {
+            const r = await winAudio('list').catch(() => ({ apps: [] }));
+            for (const a of [].concat(r.apps || [])) out.push({ value: `app:${a.name}`, label: `Aplikacja: ${a.label || a.name}` });
         }
         for (const pl of await listPlayers().catch(() => [])) out.push({ value: `player:${pl.value}`, label: `Odtwarzacz: ${pl.label}` });
         return out;
@@ -337,7 +400,11 @@ function createPlatform({ clipboard, shell, log = () => {} }) {
             return d ? { volume: pct(d.volume), muted: Boolean(d.mute) } : { volume: null, muted: null };
         }
         if (kind === 'app') {
-            const si = (await pactlJson('sink-inputs')).find((x) => appName(x) === id);
+            if (isWin) {
+                const a = [].concat((await winAudio('list')).apps || []).find((x) => String(x.name).toLowerCase() === id.toLowerCase());
+                return a ? { volume: a.volume, muted: a.muted } : { volume: null, muted: null };
+            }
+            const si = (await pactlJson('sink-inputs')).find((x) => appName(x).toLowerCase() === id.toLowerCase() || appLabel(x).toLowerCase() === id.toLowerCase());
             return si ? { volume: pct(si.volume), muted: Boolean(si.mute) } : { volume: null, muted: null };
         }
         return { volume: null, muted: null };
@@ -357,14 +424,19 @@ function createPlatform({ clipboard, shell, log = () => {} }) {
             if (mode === 'mute') return setPlayerVolume(cur > 0 ? 0 : 50, id);
             return setPlayerVolume(clamp(mode === 'set' ? value : cur + (mode === 'up' ? step : -step)), id);
         }
-        if (isWin) throw new Error('Na Windowsie dostępna jest głośność systemu, mikrofonu i odtwarzaczy');
+        if (isWin) {
+            if (kind !== 'app') throw new Error('Na Windowsie wybierz system, mikrofon, aplikację albo odtwarzacz');
+            if (mode === 'mute') return winAudio(`mute app ${id} toggle`);
+            const cur = mode === 'set' ? 0 : ((await getTargetVolume(target)).volume || 0);
+            return winAudio(`set app ${id} ${f01(mode === 'set' ? value : cur + (mode === 'up' ? step : -step))}`);
+        }
         const amount = mode === 'set' ? `${clamp(value)}%` : mode === 'up' ? `+${step}%` : `-${step}%`;
         if (kind === 'sink' || kind === 'source') {
             if (mode === 'mute') return exec('pactl', [`set-${kind}-mute`, id, 'toggle']);
             return exec('pactl', [`set-${kind}-volume`, id, amount]);
         }
         if (kind === 'app') {
-            const list = (await pactlJson('sink-inputs')).filter((x) => appName(x) === id);
+            const list = (await pactlJson('sink-inputs')).filter((x) => appName(x).toLowerCase() === id.toLowerCase() || appLabel(x).toLowerCase() === id.toLowerCase());
             if (!list.length) throw new Error(`Aplikacja „${id}” teraz nic nie gra`);
             for (const si of list) await exec('pactl', mode === 'mute' ? ['set-sink-input-mute', String(si.index), 'toggle'] : ['set-sink-input-volume', String(si.index), amount]);
             return;
@@ -375,12 +447,13 @@ function createPlatform({ clipboard, shell, log = () => {} }) {
         const v = Math.max(0, Math.min(100, Math.round(value)));
         if (audio === 'wpctl') return exec('wpctl', ['set-volume', '@DEFAULT_AUDIO_SOURCE@', `${v}%`]);
         if (audio === 'pactl') return exec('pactl', ['set-source-volume', '@DEFAULT_SOURCE@', `${v}%`]);
+        if (isWin) return winAudio(`set mic ${f01(v)}`);
         throw new Error('Nie znaleziono sterowania mikrofonem.');
     }
     async function setMic(mode) {
         if (audio === 'wpctl') return exec('wpctl', ['set-mute', '@DEFAULT_AUDIO_SOURCE@', mode === 'toggle' ? 'toggle' : mode === 'mute' ? '1' : '0']);
         if (audio === 'pactl') return exec('pactl', ['set-source-mute', '@DEFAULT_SOURCE@', mode === 'toggle' ? 'toggle' : mode === 'mute' ? '1' : '0']);
-        if (isWin) return pressCombo(['micmute']);
+        if (isWin) return winAudio(`mute mic ${mode === 'toggle' ? 'toggle' : mode === 'mute' ? 'on' : 'off'}`).catch(() => pressCombo(['micmute']));
         throw new Error('Nie znaleziono sterowania mikrofonem.');
     }
 
@@ -428,6 +501,7 @@ function createPlatform({ clipboard, shell, log = () => {} }) {
     }
 
     function dispose() {
+        try { if (winAudioProc) winAudioProc.kill(); } catch {}
         stopSounds();
         if (uinput) { try { uinput.proc.stdin.end(); uinput.proc.kill(); } catch {} uinput = null; }
     }

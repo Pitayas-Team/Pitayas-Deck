@@ -58,7 +58,7 @@
         for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) if (!covered.has(`${x},${y}`)) items.push({ key: `${x},${y}`, x, y, w: 1, h: 1, b: null });
         for (const it of items) {
             const wrap = document.createElement('div');
-            wrap.className = 'cell' + (it.b ? ' filled' : ' blank');
+            wrap.className = 'cell' + (it.b ? ' filled' : ' blank') + (it.b && it.b.pinned ? ' pinned' : '') + (it.b && it.b.home ? ' foreign' : '');
             wrap.style.gridColumn = `${it.x + 1} / span ${it.w}`;
             wrap.style.gridRow = `${it.y + 1} / span ${it.h}`;
             wrap.dataset.key = it.key;
@@ -66,8 +66,9 @@
             R.paint(el, PD.fixImage(it.b), cell);
             if (it.b && it.b.type === 'media' && it.w < 2) el.classList.add('narrow');
             wrap.appendChild(el);
-            wrap.insertAdjacentHTML('beforeend', it.b ? `<span class="cell-edit">${PD.icon(testMode ? 'play' : 'pencil')}${testMode ? 'Naciśnij' : 'Edytuj'}</span>` : `<span class="cell-add">${PD.icon('plus')}</span>`);
-            wrap.draggable = Boolean(it.b) && !testMode;
+            wrap.insertAdjacentHTML('beforeend', it.b ? `<span class="cell-edit">${PD.icon(testMode ? 'play' : 'pencil')}${testMode ? 'Naciśnij' : it.b.home ? `Przypięty z: ${esc((PD.data.deck.folders[it.b.home] || {}).name || '')}` : 'Edytuj'}</span>` : `<span class="cell-add">${PD.icon('plus')}</span>`);
+            if (it.b && it.b.pinned) wrap.insertAdjacentHTML('beforeend', `<span class="pin-badge" title="Przypięty — widoczny w każdym folderze">${PD.icon('pin')}</span>`);
+            wrap.draggable = Boolean(it.b) && !testMode && !it.b.home;
             grid.appendChild(wrap);
         }
         R.tickClocks(grid);
@@ -112,7 +113,9 @@
         if (!cell) return;
         const key = cell.dataset.key;
         const b = PD.folder().buttons[key];
-        if (!b) return testMode ? null : openWidgetPicker(key);
+        const shown = lastState && lastState.buttons[key];
+        if (!b && shown && shown.home && !testMode) return PD.go('widget', { folderId: shown.home, key });
+        if (!b && !(shown && shown.home)) return testMode ? null : openWidgetPicker(key);
         if (testMode) {
             if (held) { held = false; return; }
             if (b.type === 'media') {
@@ -183,8 +186,17 @@
         e.preventDefault();
         const key = c.dataset.key;
         const b = PD.folder().buttons[key];
+        const shown = lastState && lastState.buttons[key];
+        if (!b && shown && shown.home) {
+            return PD.menu(e.clientX, e.clientY, [['edit-home', `Edytuj (folder „${(PD.data.deck.folders[shown.home] || {}).name}”)`, 'pencil'], ['unpin-home', 'Odepnij', 'pin-off']], async (cmd) => {
+                if (cmd === 'edit-home') return PD.go('widget', { folderId: shown.home, key });
+                const w = clone(PD.data.deck.folders[shown.home].buttons[key]); delete w.pinned;
+                await deck.setButton(shown.home, key, w); await PD.reload(); renderGrid(); PD.toast('Odpięto');
+            });
+        }
         const items = b ? [
             ['edit', 'Edytuj', 'pencil'], ['run', 'Uruchom', 'play'], null,
+            ['pin', b && b.pinned ? 'Odepnij' : 'Przypnij (w każdym folderze)', b && b.pinned ? 'pin-off' : 'pin'], null,
             ['copy', 'Kopiuj', 'copy'], ['cut', 'Wytnij', 'scissors'], ['duplicate', 'Duplikuj', 'copy-plus'], ['paste', 'Wklej tutaj', 'clipboard-paste', '', !clipWidget], null,
             ['delete', 'Usuń', 'trash-2', 'danger'],
         ] : [['add', 'Dodaj widżet', 'plus'], ['paste', 'Wklej tutaj', 'clipboard-paste', '', !clipWidget]];
@@ -192,6 +204,12 @@
             if (cmd === 'edit') return PD.go('widget', { folderId: PD.folderId, key });
             if (cmd === 'add') return openWidgetPicker(key);
             if (cmd === 'run') { const res = await deck.testButton(PD.folderId, key, 'press'); PD.toast(res.ok ? 'Wykonano' : res.errors.join(' · '), res.ok ? 'success' : 'error'); return; }
+            if (cmd === 'pin') {
+                const w = clone(b);
+                if (w.pinned) delete w.pinned; else w.pinned = true;
+                await deck.setButton(PD.folderId, key, w);
+                PD.toast(w.pinned ? 'Przypięto — widżet pokaże się w tym miejscu w każdym folderze profilu' : 'Odpięto');
+            }
             if (cmd === 'copy') { clipWidget = clone(b); return PD.toast('Skopiowano widżet'); }
             if (cmd === 'cut') { clipWidget = clone(b); await deck.setButton(PD.folderId, key, null); }
             if (cmd === 'duplicate') { await PD.duplicateWidget(key); return; }

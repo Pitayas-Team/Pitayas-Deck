@@ -85,8 +85,9 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
         // Okładka z lokalnego pliku odtwarzacza (file://…) — tylko obrazy i tylko gdy to aktualna okładka
         if (p === '/art') {
             const f = url.searchParams.get('f') || '';
-            const current = String(runtime.getVariable('media.artUrl') || '');
-            if (!current.startsWith('file://') || decodeURIComponent(current.slice(7)) !== f || !/\.(png|jpe?g|webp|gif)$/i.test(f)) { res.writeHead(404); res.end(); return; }
+            // Tylko okładki, które właśnie pokazują odtwarzacze (ogólny i wybrane w widżetach)
+            const allowed = [runtime.getVariable('media.artUrl'), ...deckApi.usedMediaPlayers().map((pl) => runtime.getVariable(`media.pl_${String(pl).replace(/[^\w]/g, '_')}_artUrl`))].map((x) => String(x || ''));
+            if (!allowed.some((c) => c.startsWith('file://') && decodeURIComponent(c.slice(7)) === f) || !/\.(png|jpe?g|webp|gif)$/i.test(f)) { res.writeHead(404); res.end(); return; }
             return serveFile(res, f);
         }
         const plug = p.match(/^\/p\/([\w-]+)(\/.*)?$/);
@@ -188,22 +189,57 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
             out.gaugeStyle = w.gaugeStyle || 'ring';
         }
         if (out.type === 'media') {
-            const g = (n) => runtime.getVariable(`media.${n}`);
+            const pl = (w.media || {}).player;
+            const pre = pl ? `media.pl_${String(pl).replace(/[^\w]/g, '_')}_` : 'media.';
+            const g = (n) => runtime.getVariable(`${pre}${n}`);
             out.media = {
                 title: g('title') || '', artist: g('artist') || '', album: (w.media || {}).album === false ? '' : (g('album') || ''),
-                art: artUrl(g('artUrl')), playing: truthy(g('playing')), position: num('media.position'), length: num('media.length'),
-                timeline: (w.media || {}).timeline !== false, player: g('player') || '',
+                art: artUrl(g('artUrl')), playing: truthy(g('playing')), position: num(`${pre}position`), length: num(`${pre}length`),
+                timeline: (w.media || {}).timeline !== false, player: g('player') || pl || '',
             };
         }
         return out;
     }
+
+    // ───── Przypięte widżety: widoczne w tym samym miejscu w każdym folderze profilu ─────
+    // Zwraca widżety folderu razem z przypiętymi z innych folderów: { key: { w, home, pinned } }.
+    // Własny widżet folderu zawsze wygrywa; przypięty pojawia się tylko na wolnych polach.
+    function effective(folderId) {
+        const folder = store.folder(folderId);
+        const out = {};
+        const occ = new Set();
+        const mark = (key, w) => { const [x, y] = key.split(',').map(Number); for (let dx = 0; dx < (w.w || 1); dx++) for (let dy = 0; dy < (w.h || 1); dy++) occ.add(`${x + dx},${y + dy}`); };
+        const free = (key, w) => { const [x, y] = key.split(',').map(Number); for (let dx = 0; dx < (w.w || 1); dx++) for (let dy = 0; dy < (w.h || 1); dy++) if (occ.has(`${x + dx},${y + dy}`)) return false; return true; };
+        for (const [key, w] of Object.entries((folder && folder.buttons) || {})) { out[key] = { w, home: folderId, pinned: false }; mark(key, w); }
+        const prof = store.profileOfFolder(folderId);
+        if (!prof) return out;
+        const grid = store.gridOf(folderId);
+        for (const f of Object.values(store.deck.folders)) {
+            if (f.id === folderId) continue;
+            const root = store.folderPath(f.id)[0];
+            if (!root || root.id !== prof.root) continue;
+            for (const [key, w] of Object.entries(f.buttons || {})) {
+                if (!w.pinned || out[key]) continue;
+                const [x, y] = key.split(',').map(Number);
+                if (x + (w.w || 1) > grid.cols || y + (w.h || 1) > grid.rows || !free(key, w)) continue;
+                out[key] = { w, home: f.id, pinned: true };
+                mark(key, w);
+            }
+        }
+        return out;
+    }
+    const widgetAt = (folderId, key) => { const e = effective(folderId)[key]; return e ? e.w : null; };
 
     function folderState(folderId, deviceId) {
         const folder = store.folder(folderId);
         const profile = store.profileOfFolder(folderId) || store.profile();
         const grid = store.gridOf(folderId);
         const buttons = {};
-        for (const [key, b] of Object.entries((folder && folder.buttons) || {})) buttons[key] = renderButton(b, folderId, key);
+        for (const [key, e] of Object.entries(effective(folderId))) {
+            buttons[key] = renderButton(e.w, e.home, key);
+            if (e.pinned) buttons[key].home = e.home;   // edytor: kliknięcie otwiera widżet w jego folderze
+            if (e.w.pinned) buttons[key].pinned = true;
+        }
         const device = deviceId ? store.device(deviceId) : null;
         return {
             t: 'state',
@@ -218,8 +254,7 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
     // Zmienne użyte przez widżety widocznego folderu
     function folderVariables(folderId) {
         const used = new Set();
-        const folder = store.folder(folderId);
-        for (const b of Object.values((folder && folder.buttons) || {})) {
+        for (const b of Object.values(effective(folderId)).map((e) => e.w)) {
             for (const n of runtime.variablesUsed(b.label)) used.add(n);
             if (b.on) for (const n of runtime.variablesUsed(b.on.label)) used.add(n);
             for (const s of b.states || []) for (const n of runtime.variablesUsed(s.look && s.look.label)) used.add(n);
@@ -227,7 +262,11 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
             if (b.stateVar) used.add(b.stateVar);
             if (b.type === 'slider') ['media.volume', 'media.micVolume', 'media.playerVolume', b.slider && b.slider.var, b.slider && b.slider.target && `media.vol_${String(b.slider.target).replace(/[^\w]/g, '_')}`].forEach((n) => n && used.add(n));
             if (b.type === 'gauge') for (const g of b.gauges || []) used.add(g.var);
-            if (b.type === 'media') ['title', 'artist', 'album', 'artUrl', 'playing', 'position', 'length', 'player'].forEach((n) => used.add(`media.${n}`));
+            if (b.type === 'media') {
+                const pl = (b.media || {}).player;
+                const pre = pl ? `media.pl_${String(pl).replace(/[^\w]/g, '_')}_` : 'media.';
+                ['title', 'artist', 'album', 'artUrl', 'playing', 'position', 'length', 'player'].forEach((n) => used.add(`${pre}${n}`));
+            }
         }
         return used;
     }
@@ -319,6 +358,12 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
             if (next < 0) throw new Error(`Brak stanu „${stateId}”`);
             store.setWidgetState(folderId, key, w.states[next].id);
         },
+        // Odtwarzacze wybrane w widżetach odtwarzacza (np. tylko Spotify)
+        usedMediaPlayers() {
+            const out = new Set();
+            for (const f of Object.values(store.deck.folders)) for (const w of Object.values(f.buttons || {})) if (w.type === 'media' && w.media && w.media.player) out.add(w.media.player);
+            return [...out];
+        },
         // Cele głośności używane przez suwaki i akcje (wtyczka „Muzyka i dźwięk” odczytuje ich poziom)
         usedAudioTargets() {
             const out = new Set();
@@ -354,10 +399,11 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
 
     // Akcje widżetu (wspólne dla telefonu i przycisku „Testuj” w edytorze)
     async function trigger(deviceId, folderId, key, phase, locals = {}) {
-        const folder = store.folder(folderId);
-        const w = folder && folder.buttons[key];
-        if (!w) return [];
+        const e = effective(folderId)[key];
+        if (!e) return [];
+        const w = e.w;
         if (deviceId === 'editor') editorFolder = folderId;
+        folderId = e.home;   // przypięty widżet działa (i ma stan) w swoim folderze
         // Przycisk „przełączany naciśnięciem” zmienia stan przed wykonaniem akcji
         if (phase === 'press' && Array.isArray(w.states) && w.states.length > 1 && w.stateSource === 'cycle') deckApi.setState(folderId, key, 'next');
         const actions = (w.actions && w.actions[phase]) || [];
@@ -366,7 +412,9 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
     }
     const sliderTimers = new Map();
     async function slider(deviceId, folderId, key, value) {
-        const w = store.folder(folderId) && store.folder(folderId).buttons[key];
+        const e = effective(folderId)[key];
+        const w = e && e.w;
+        if (e) folderId = e.home;
         if (!w || w.type !== 'slider') return;
         const s = w.slider || {};
         const v = Math.max(s.min ?? 0, Math.min(s.max ?? 100, Number(value) || 0));
@@ -429,7 +477,9 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
         }
         if (msg.t === 'media') {
             const cmd = { previous: 'previous', 'play-pause': 'play-pause', next: 'next' }[msg.cmd];
-            if (cmd) runtime.runActions([{ plugin: 'media', action: 'media', config: { command: cmd } }], { device: s.deviceId });
+            const w = widgetAt(s.folderId, String(msg.key || ''));
+            const player = (w && w.media && w.media.player) || '';
+            if (cmd) runtime.runActions([{ plugin: 'media', action: 'media', config: { command: cmd, player } }], { device: s.deviceId });
             return;
         }
         if (msg.t === 'nav') {

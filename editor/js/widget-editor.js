@@ -99,7 +99,8 @@
         const body = $('weLookBody');
         let h = '';
         // Rozmiar
-        h += `<div class="lk-sec"><div class="lk-title">Rozmiar</div><div class="size-row"><input class="m-input" type="number" min="1" max="16" id="lkW" value="${b.w || 1}"><span>×</span><input class="m-input" type="number" min="1" max="12" id="lkH" value="${b.h || 1}"><span class="m-small">pól</span></div></div>`;
+        h += `<div class="lk-sec"><div class="lk-title">Rozmiar</div><div class="size-row"><input class="m-input" type="number" min="1" max="16" id="lkW" value="${b.w || 1}"><span>×</span><input class="m-input" type="number" min="1" max="12" id="lkH" value="${b.h || 1}"><span class="m-small">pól</span></div>
+            <label class="toggle-row"><span>Przypięty — widoczny w tym miejscu w każdym folderze</span><input type="checkbox" class="switch" id="lkPin" ${b.pinned ? 'checked' : ''}></label></div>`;
         if (type === 'button') {
             const multi = Array.isArray(b.states) && b.states.length;
             const mode = multi ? 'multi' : b.stateVar ? 'toggle' : 'single';
@@ -206,9 +207,10 @@
         if (type === 'media') {
             const m = b.media || {};
             return `<div class="lk-sec"><div class="lk-title">Odtwarzacz</div>
+                <div class="m-field"><span class="m-label">Pokazuje</span><select class="m-select" id="wsMediaPlayer"><option value="">Ten, który właśnie gra</option>${m.player ? `<option value="${esc(m.player)}">${esc(m.player)}</option>` : ''}</select></div>
                 <label class="toggle-row"><span>Pokazuj album</span><input type="checkbox" class="switch" data-med="album" ${m.album ? 'checked' : ''}></label>
                 <label class="toggle-row"><span>Pasek postępu</span><input type="checkbox" class="switch" data-med="timeline" ${m.timeline !== false ? 'checked' : ''}></label>
-                <div class="m-small">Pokazuje odtwarzacz, który właśnie gra (Spotify, przeglądarka, VLC…).</div></div>`;
+                <div class="m-small">Przyciski widżetu sterują wybranym odtwarzaczem.</div></div>`;
         }
         if (type === 'gauge') {
             const list = b.gauges || [];
@@ -249,6 +251,7 @@
             PD.saveLast({ page: 'widget', arg: { folderId, key } });
             renderAll();
         };
+        $('lkPin').onchange = () => { update((x) => { if ($('lkPin').checked) x.pinned = true; else delete x.pinned; }); PD.toast($('lkPin').checked ? 'Przypięto — widżet pokaże się w każdym folderze profilu (gdzie to pole jest wolne)' : 'Odpięto'); };
         $('lkW').onchange = resize; $('lkH').onchange = resize;
         // Stan
         segHandler('stateMode', (v) => {
@@ -328,6 +331,17 @@
         if ($('wsShow')) $('wsShow').onchange = () => update((x) => { x.slider.showValue = $('wsShow').checked; });
         body.querySelectorAll('[data-clk]').forEach((el) => el.onchange = () => update((x) => { x.clock = { ...(x.clock || {}), [el.dataset.clk]: el.checked }; }));
         body.querySelectorAll('[data-med]').forEach((el) => el.onchange = () => update((x) => { x.media = { ...(x.media || {}), [el.dataset.med]: el.checked }; }));
+        if ($('wsMediaPlayer')) {
+            const sel = $('wsMediaPlayer'), cur = (b.media || {}).player || '';
+            deck.fieldOptions('media', 'media', 'player').then((opts) => {
+                if (!$('wsMediaPlayer')) return;
+                const list = opts.filter((o) => o.value);
+                sel.innerHTML = '<option value="">Ten, który właśnie gra</option>' + list.map((o) => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('') +
+                    (cur && !list.some((o) => o.value === cur) ? `<option value="${esc(cur)}">${esc(cur)} (teraz nie działa)</option>` : '');
+                sel.value = cur;
+            }).catch(() => {});
+            sel.onchange = () => update((x) => { x.media = { ...(x.media || {}) }; if (sel.value) x.media.player = sel.value; else delete x.media.player; });
+        }
         segHandler('gstyle', (v) => update((x) => { x.gaugeStyle = v; }, { look: true }));
         body.querySelectorAll('[data-gv]').forEach((el) => el.onclick = () => PD.pickVariable((n) => update((x) => { x.gauges[+el.dataset.gv].var = n; }, { look: true })));
         body.querySelectorAll('[data-gf]').forEach((inp) => inp.oninput = () => { const i = +inp.closest('[data-g]').dataset.g; update((x) => { x.gauges[i][inp.dataset.gf] = inp.dataset.gf === 'max' ? Number(inp.value) : inp.value; }); });
