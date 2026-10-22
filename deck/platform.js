@@ -310,6 +310,67 @@ function createPlatform({ clipboard, shell, log = () => {} }) {
         }
         throw new Error('Nie znaleziono sterowania dźwiękiem (wpctl ani pactl).');
     }
+    // ───── Wszystko, czym da się sterować głośnością ─────
+    // Cele: system | mic | sink:<nazwa> | source:<nazwa> | app:<nazwa aplikacji> | player:<odtwarzacz MPRIS>
+    const pactlJson = async (what) => { try { return JSON.parse(await exec('pactl', ['-f', 'json', 'list', what])); } catch { return []; } };
+    const pct = (vol) => { const ch = vol && Object.values(vol)[0]; return ch ? parseInt(String(ch.value_percent || '0'), 10) : 0; };
+    const appName = (si) => (si.properties && (si.properties['application.name'] || si.properties['application.process.binary'])) || '';
+    async function audioTargets() {
+        const out = [{ value: 'system', label: 'Głośność systemu (domyślne wyjście)' }, { value: 'mic', label: 'Mikrofon (domyślne wejście)' }];
+        if (!isWin && (audio === 'pactl' || audio === 'wpctl') && which('pactl')) {
+            for (const d of await pactlJson('sinks')) out.push({ value: `sink:${d.name}`, label: `Wyjście: ${d.description && d.description !== '(null)' ? d.description : d.name}` });
+            for (const d of await pactlJson('sources')) if (!/\.monitor$/.test(d.name)) out.push({ value: `source:${d.name}`, label: `Wejście: ${d.description && d.description !== '(null)' ? d.description : d.name}` });
+            const apps = new Set();
+            for (const si of await pactlJson('sink-inputs')) { const n = appName(si); if (n && !apps.has(n)) { apps.add(n); out.push({ value: `app:${n}`, label: `Aplikacja: ${n}` }); } }
+        }
+        for (const pl of await listPlayers().catch(() => [])) out.push({ value: `player:${pl.value}`, label: `Odtwarzacz: ${pl.label}` });
+        return out;
+    }
+    async function getTargetVolume(target = 'system') {
+        const [kind, ...rest] = String(target).split(':');
+        const id = rest.join(':');
+        if (kind === 'system') return getVolume('sink');
+        if (kind === 'mic') return getVolume('source');
+        if (kind === 'player') { const np = await nowPlaying(id); return { volume: np.volume, muted: null }; }
+        if (kind === 'sink' || kind === 'source') {
+            const d = (await pactlJson(kind === 'sink' ? 'sinks' : 'sources')).find((x) => x.name === id);
+            return d ? { volume: pct(d.volume), muted: Boolean(d.mute) } : { volume: null, muted: null };
+        }
+        if (kind === 'app') {
+            const si = (await pactlJson('sink-inputs')).find((x) => appName(x) === id);
+            return si ? { volume: pct(si.volume), muted: Boolean(si.mute) } : { volume: null, muted: null };
+        }
+        return { volume: null, muted: null };
+    }
+    async function setTargetVolume(target = 'system', mode = 'set', step = 5, value = 50) {
+        const [kind, ...rest] = String(target).split(':');
+        const id = rest.join(':');
+        const clamp = (v) => Math.max(0, Math.min(100, Math.round(v)));
+        if (kind === 'system') return setVolume(mode, step, value);
+        if (kind === 'mic') {
+            if (mode === 'mute') return setMic('toggle');
+            const cur = (await getVolume('source')).volume || 0;
+            return setMicVolume(clamp(mode === 'set' ? value : cur + (mode === 'up' ? step : -step)));
+        }
+        if (kind === 'player') {
+            const cur = (await nowPlaying(id)).volume || 0;
+            if (mode === 'mute') return setPlayerVolume(cur > 0 ? 0 : 50, id);
+            return setPlayerVolume(clamp(mode === 'set' ? value : cur + (mode === 'up' ? step : -step)), id);
+        }
+        if (isWin) throw new Error('Na Windowsie dostępna jest głośność systemu, mikrofonu i odtwarzaczy');
+        const amount = mode === 'set' ? `${clamp(value)}%` : mode === 'up' ? `+${step}%` : `-${step}%`;
+        if (kind === 'sink' || kind === 'source') {
+            if (mode === 'mute') return exec('pactl', [`set-${kind}-mute`, id, 'toggle']);
+            return exec('pactl', [`set-${kind}-volume`, id, amount]);
+        }
+        if (kind === 'app') {
+            const list = (await pactlJson('sink-inputs')).filter((x) => appName(x) === id);
+            if (!list.length) throw new Error(`Aplikacja „${id}” teraz nic nie gra`);
+            for (const si of list) await exec('pactl', mode === 'mute' ? ['set-sink-input-mute', String(si.index), 'toggle'] : ['set-sink-input-volume', String(si.index), amount]);
+            return;
+        }
+        throw new Error(`Nieznany cel głośności: ${target}`);
+    }
     async function setMicVolume(value) {
         const v = Math.max(0, Math.min(100, Math.round(value)));
         if (audio === 'wpctl') return exec('wpctl', ['set-volume', '@DEFAULT_AUDIO_SOURCE@', `${v}%`]);
@@ -371,7 +432,7 @@ function createPlatform({ clipboard, shell, log = () => {} }) {
         if (uinput) { try { uinput.proc.stdin.end(); uinput.proc.kill(); } catch {} uinput = null; }
     }
 
-    return { pressCombo, parseCombo, typeText, media, nowPlaying, listPlayers, setShuffle, setLoop, openUri, seek, setPlayerVolume, getVolume, setVolume, setMic, setMicVolume, playSound, stopSounds, open, runCommand, keyboardBackend, dispose, which, exec };
+    return { pressCombo, parseCombo, typeText, media, nowPlaying, listPlayers, audioTargets, getTargetVolume, setTargetVolume, setShuffle, setLoop, openUri, seek, setPlayerVolume, getVolume, setVolume, setMic, setMicVolume, playSound, stopSounds, open, runCommand, keyboardBackend, dispose, which, exec };
 }
 
 module.exports = { createPlatform, which };

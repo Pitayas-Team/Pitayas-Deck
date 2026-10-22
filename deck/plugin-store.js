@@ -65,6 +65,16 @@ function extractTgz(buffer, dest) {
     }
 }
 
+// Kopiowanie folderu dodatku. Bez fs.cpSync: wbudowane dodatki leżą w app.asar, a cpSync (opendir) nie umie czytać z asar
+function copyDir(src, dest) {
+    fs.mkdirSync(dest, { recursive: true });
+    for (const name of fs.readdirSync(src)) {
+        const from = path.join(src, name), to = path.join(dest, name);
+        if (fs.statSync(from).isDirectory()) copyDir(from, to);
+        else fs.writeFileSync(to, fs.readFileSync(from));
+    }
+}
+
 function createPluginStore({ appDir, pluginsDir, dataDir, runtime, settings, log = () => {} }) {
     const bundledDir = path.join(appDir, 'deck', 'store');
     const stateFile = path.join(dataDir, 'store.json');
@@ -159,7 +169,7 @@ function createPluginStore({ appDir, pluginsDir, dataDir, runtime, settings, log
         try {
             let sha = null;
             if (p.source === 'bundled') {
-                fs.cpSync(p.dir, tmp, { recursive: true });
+                copyDir(p.dir, tmp);
             } else {
                 const res = await fetch(p.package.url, { headers: { 'User-Agent': 'Pitaya-Deck' } });
                 if (!res.ok) throw new Error(`Pobieranie nie powiodło się (HTTP ${res.status})`);

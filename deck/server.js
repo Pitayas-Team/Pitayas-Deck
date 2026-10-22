@@ -172,7 +172,7 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
         const num = (name) => { const v = parseFloat(runtime.getVariable(name)); return isNaN(v) ? 0 : v; };
         if (out.type === 'slider') {
             const s = w.slider || {};
-            const varName = { volume: 'media.volume', mic: 'media.micVolume', player: 'media.playerVolume' }[s.preset] || s.var;
+            const varName = s.preset === 'target' ? `media.vol_${String(s.target || 'system').replace(/[^\w]/g, '_')}` : ({ volume: 'media.volume', mic: 'media.micVolume', player: 'media.playerVolume' }[s.preset] || s.var);
             out.slider = {
                 value: varName ? num(varName) : (s.value || 0), min: s.min ?? 0, max: s.max ?? 100, step: s.step || 1,
                 orientation: s.orientation || (out.h > out.w ? 'vertical' : 'horizontal'), showValue: s.showValue !== false, unit: s.unit ?? (s.preset ? '%' : ''),
@@ -225,7 +225,7 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
             for (const s of b.states || []) for (const n of runtime.variablesUsed(s.look && s.look.label)) used.add(n);
             for (const r of b.stateRules || []) used.add(r.var);
             if (b.stateVar) used.add(b.stateVar);
-            if (b.type === 'slider') ['media.volume', 'media.micVolume', 'media.playerVolume', b.slider && b.slider.var].forEach((n) => n && used.add(n));
+            if (b.type === 'slider') ['media.volume', 'media.micVolume', 'media.playerVolume', b.slider && b.slider.var, b.slider && b.slider.target && `media.vol_${String(b.slider.target).replace(/[^\w]/g, '_')}`].forEach((n) => n && used.add(n));
             if (b.type === 'gauge') for (const g of b.gauges || []) used.add(g.var);
             if (b.type === 'media') ['title', 'artist', 'album', 'artUrl', 'playing', 'position', 'length', 'player'].forEach((n) => used.add(`media.${n}`));
         }
@@ -319,6 +319,16 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
             if (next < 0) throw new Error(`Brak stanu „${stateId}”`);
             store.setWidgetState(folderId, key, w.states[next].id);
         },
+        // Cele głośności używane przez suwaki i akcje (wtyczka „Muzyka i dźwięk” odczytuje ich poziom)
+        usedAudioTargets() {
+            const out = new Set();
+            const walk = (list) => { for (const b of list || []) { if (!b) continue; if (b.plugin === 'media' && b.action === 'volume' && b.config && b.config.target) out.add(b.config.target); for (const k of ['blocks', 'else', 'otherwise']) walk(b[k]); for (const x of b.branches || []) walk(x.blocks); for (const x of b.cases || []) walk(x.blocks); } };
+            for (const f of Object.values(store.deck.folders)) for (const w of Object.values(f.buttons || {})) {
+                if (w.type === 'slider' && w.slider && w.slider.preset === 'target' && w.slider.target) out.add(w.slider.target);
+                for (const l of Object.values(w.actions || {})) walk(l);
+            }
+            return [...out];
+        },
         // Skrypty: wspólne listy bloków (strona „Skrypty” w edytorze)
         scripts: () => (store.deck.scripts || []).map((x) => ({ value: x.id, label: x.name || 'Skrypt' })),
         async runScript(id, extra = {}) {
@@ -363,6 +373,7 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
         if (s.preset === 'volume') await runtime.runActions([{ plugin: 'media', action: 'volume', config: { mode: 'set', value: v } }], { device: deviceId });
         else if (s.preset === 'mic') await runtime.runActions([{ plugin: 'media', action: 'mic-volume', config: { value: v } }], { device: deviceId });
         else if (s.preset === 'player') await runtime.runActions([{ plugin: 'media', action: 'player-volume', config: { value: v, player: s.player || '' } }], { device: deviceId });
+        else if (s.preset === 'target') await runtime.runActions([{ plugin: 'media', action: 'volume', config: { target: s.target || 'system', mode: 'set', value: v } }], { device: deviceId });
         else {
             if (s.var && !s.var.includes('.')) runtime.setUserVariable(s.var, v, 'number');
             await trigger(deviceId, folderId, key, 'change', { value: v });

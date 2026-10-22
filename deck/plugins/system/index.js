@@ -20,33 +20,50 @@ function hwmon(name) {
     return null;
 }
 let nvidia = null;
+let winGpuBusy = false;
 function slowTick(ctx) {
-    if (process.platform !== 'linux') return;
-    const cpuSensor = hwmon('k10temp') || hwmon('coretemp') || hwmon('zenpower');
-    const t = cpuSensor && read(`${cpuSensor}/temp1_input`);
-    if (t) ctx.setVariable('cpuTemp', Math.round(parseInt(t, 10) / 1000));
-    try {
-        for (const c of fs.readdirSync('/sys/class/drm')) {
-            const busy = read(`/sys/class/drm/${c}/device/gpu_busy_percent`);
-            if (busy !== null) { ctx.setVariable('gpuAmd', parseInt(busy, 10)); break; }
-        }
-    } catch {}
-    for (const b of ['BAT0', 'BAT1', 'BAT2']) {
-        const cap = read(`/sys/class/power_supply/${b}/capacity`);
-        if (cap !== null) {
-            ctx.setVariable('battery', parseInt(cap, 10));
-            ctx.setVariable('charging', /Charging|Full/.test(read(`/sys/class/power_supply/${b}/status`) || ''));
-            break;
+    if (process.platform === 'linux') {
+        const cpuSensor = hwmon('k10temp') || hwmon('coretemp') || hwmon('zenpower');
+        const t = cpuSensor && read(`${cpuSensor}/temp1_input`);
+        if (t) ctx.setVariable('cpuTemp', Math.round(parseInt(t, 10) / 1000));
+        try {
+            for (const c of fs.readdirSync('/sys/class/drm')) {
+                const busy = read(`/sys/class/drm/${c}/device/gpu_busy_percent`);
+                if (busy !== null) {
+                    ctx.setVariable('gpuAmd', parseInt(busy, 10));
+                    if (nvidia === false) ctx.setVariable('gpu', parseInt(busy, 10));   // bez NVIDII: GPU = karta AMD
+                    break;
+                }
+            }
+        } catch {}
+        for (const b of ['BAT0', 'BAT1', 'BAT2']) {
+            const cap = read(`/sys/class/power_supply/${b}/capacity`);
+            if (cap !== null) {
+                ctx.setVariable('battery', parseInt(cap, 10));
+                ctx.setVariable('charging', /Charging|Full/.test(read(`/sys/class/power_supply/${b}/status`) || ''));
+                break;
+            }
         }
     }
+    // NVIDIA: nvidia-smi jest w sterowniku na Linuxie i Windowsie
     if (nvidia !== false) {
-        execFile('nvidia-smi', ['--query-gpu=utilization.gpu,temperature.gpu,memory.used,memory.total', '--format=csv,noheader,nounits'], { timeout: 3000 }, (err, out) => {
+        execFile('nvidia-smi', ['--query-gpu=utilization.gpu,temperature.gpu,memory.used,memory.total', '--format=csv,noheader,nounits'], { timeout: 3000, windowsHide: true }, (err, out) => {
             if (err) { nvidia = false; return; }
             nvidia = true;
             const [util, temp, used, total] = out.split('\n')[0].split(',').map((x) => parseFloat(x));
             ctx.setVariable('gpu', util);
             ctx.setVariable('gpuTemp', temp);
             ctx.setVariable('gpuMem', Math.round((used / total) * 100));
+        });
+    }
+    // Windows bez NVIDII (AMD, Intel): liczniki wydajności GPU z systemu (nazwy klas WMI nie zależą od języka Windows)
+    if (process.platform === 'win32' && nvidia === false && !winGpuBusy) {
+        winGpuBusy = true;
+        const script = "$e=Get-CimInstance Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '*engtype_3D' }; $s=($e | Measure-Object -Property UtilizationPercentage -Sum).Sum; if ($s -eq $null) { $s = -1 }; [math]::Min(100,[math]::Round($s))";
+        execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { timeout: 8000, windowsHide: true }, (err, out) => {
+            winGpuBusy = false;
+            const v = parseInt(String(out || '').trim(), 10);
+            if (!err && v >= 0) ctx.setVariable('gpu', v);
         });
     }
 }
@@ -128,7 +145,7 @@ module.exports = {
         { id: 'ram', label: 'Pamięć %' },
         { id: 'ramUsed', label: 'Pamięć zajęta (GB)' },
         { id: 'cpuTemp', label: 'Temperatura procesora (°C)' },
-        { id: 'gpu', label: 'Karta graficzna NVIDIA %' },
+        { id: 'gpu', label: 'Karta graficzna %' },
         { id: 'gpuTemp', label: 'Temperatura GPU NVIDIA (°C)' },
         { id: 'gpuMem', label: 'Pamięć GPU NVIDIA %' },
         { id: 'gpuAmd', label: 'Karta graficzna AMD %' },

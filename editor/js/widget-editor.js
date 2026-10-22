@@ -189,7 +189,7 @@
             const s = b.slider || {};
             return `<div class="lk-sec"><div class="lk-title">Suwak</div>
                 <div class="m-field"><span class="m-label">Steruje</span><select class="m-select" id="wsPreset">
-                  <option value="volume">Głośność systemu</option><option value="mic">Głośność mikrofonu</option><option value="player">Głośność odtwarzacza (MPRIS)</option><option value="custom">Własną zmienną i akcjami</option></select></div>
+                  <option value="volume">Głośność systemu</option><option value="mic">Głośność mikrofonu</option><option value="player">Odtwarzacz, który gra (MPRIS)</option><option value="custom">Własną zmienną i akcjami</option></select></div>
                 ${s.preset === 'player' ? `<div class="m-field"><span class="m-label">Odtwarzacz (puste = ten, który gra)</span><input class="m-input" id="wsPlayer" value="${esc(s.player || '')}" placeholder="spotify"></div>` : ''}
                 ${s.preset === 'custom' ? `<div class="m-field"><span class="m-label">Pokazuje wartość zmiennej</span><button class="m-btn small block var-btn" id="wsVar">${s.var ? `{${esc(s.var)}}` : 'Wybierz zmienną…'}</button></div>
                   <div class="two"><div class="m-field"><span class="m-label">Min</span><input class="m-input" type="number" id="wsMin" value="${s.min ?? 0}"></div><div class="m-field"><span class="m-label">Max</span><input class="m-input" type="number" id="wsMax" value="${s.max ?? 100}"></div></div>
@@ -225,13 +225,29 @@
         const b = W();
         const segHandler = (name, fn) => { const s = body.querySelector(`[data-seg="${name}"]`); if (s) s.onclick = (e) => { const t = e.target.closest('[data-v]'); if (t) fn(t.dataset.v); }; };
         // Rozmiar
-        const resize = () => {
+        const resize = async () => {
             const w = Math.max(1, parseInt($('lkW').value, 10) || 1), h = Math.max(1, parseInt($('lkH').value, 10) || 1);
             const prevFolder = PD.folderId; PD.folderId = folderId;
-            const ok = PD.canPlace(key, w, h, key);
+            const [x0, y0] = key.split(',').map(Number);
+            // Najpierw w miejscu; gdy przy krawędzi brakuje miejsca, przesuwamy widżet w lewo / w górę
+            let target = null;
+            for (let dy = 0; dy < h && !target; dy++) for (let dx = 0; dx < w && !target; dx++) {
+                const k = `${x0 - dx},${y0 - dy}`;
+                if (x0 - dx >= 0 && y0 - dy >= 0 && PD.canPlace(k, w, h, key)) target = k;
+            }
             PD.folderId = prevFolder;
-            if (!ok) { PD.toast('Ten rozmiar nachodzi na inne widżety albo wychodzi poza siatkę.', 'error'); $('lkW').value = b.w || 1; $('lkH').value = b.h || 1; return; }
-            update((x) => { x.w = w; x.h = h; if (x.type === 'slider' && x.slider) x.slider.orientation = h > w ? 'vertical' : 'horizontal'; });
+            if (!target) { PD.toast('Brak miejsca na taki rozmiar — zwolnij pola obok albo zmniejsz widżet.', 'error'); $('lkW').value = b.w || 1; $('lkH').value = b.h || 1; return; }
+            if (target === key) return update((x) => { x.w = w; x.h = h; if (x.type === 'slider' && x.slider) x.slider.orientation = h > w ? 'vertical' : 'horizontal'; }, { rerender: true });
+            await flush();
+            const moved = { ...clone(W()), w, h };
+            if (moved.type === 'slider' && moved.slider) moved.slider.orientation = h > w ? 'vertical' : 'horizontal';
+            await deck.setButton(folderId, key, null);
+            await deck.setButton(folderId, target, moved);
+            delete PD.data.deck.folders[folderId].buttons[key];
+            PD.data.deck.folders[folderId].buttons[target] = moved;
+            key = target;
+            PD.saveLast({ page: 'widget', arg: { folderId, key } });
+            renderAll();
         };
         $('lkW').onchange = resize; $('lkH').onchange = resize;
         // Stan
@@ -283,8 +299,27 @@
         if ($('lkBw')) $('lkBw').oninput = () => { $('lkBwV').textContent = `${$('lkBw').value}px`; lset('border', { ...(lget('border') || {}), width: +$('lkBw').value }); };
         // Ustawienia typu widżetu
         if ($('wsPreset')) {
-            $('wsPreset').value = (b.slider || {}).preset || 'volume';
-            $('wsPreset').onchange = () => update((x) => { x.slider = { ...(x.slider || {}), preset: $('wsPreset').value }; }, { rerender: true });
+            const sl = b.slider || {};
+            const cur = sl.preset === 'target' ? `target:${sl.target}` : sl.preset || 'volume';
+            $('wsPreset').value = cur;
+            // Dokładamy wszystko, czym da się sterować: urządzenia, aplikacje, odtwarzacze
+            deck.fieldOptions('media', 'volume', 'target').then((opts) => {
+                const extra = opts.filter((o) => o.value !== 'system' && o.value !== 'mic');
+                if (!$('wsPreset')) return;
+                if (extra.length) $('wsPreset').insertAdjacentHTML('beforeend', `<optgroup label="Urządzenia, aplikacje i odtwarzacze">${extra.map((o) => `<option value="target:${esc(o.value)}">${esc(o.label)}</option>`).join('')}</optgroup>`);
+                if (sl.preset === 'target' && !extra.some((o) => o.value === sl.target)) $('wsPreset').insertAdjacentHTML('beforeend', `<option value="target:${esc(sl.target)}">${esc(sl.target)} (teraz niedostępne)</option>`);
+                $('wsPreset').value = cur;
+            }).catch(() => {});
+            $('wsPreset').onchange = () => {
+                const v = $('wsPreset').value;
+                update((x) => {
+                    x.slider = { ...(x.slider || {}) };
+                    if (v.startsWith('target:')) { x.slider.preset = 'target'; x.slider.target = v.slice(7); }
+                    else { x.slider.preset = v; delete x.slider.target; }
+                    const lbl = $('wsPreset').selectedOptions[0] ? $('wsPreset').selectedOptions[0].textContent.replace(/^(Wyjście|Wejście|Aplikacja|Odtwarzacz): /, '') : '';
+                    if (!x.label || ['Głośność', 'Mikrofon', 'Spotify'].includes(x.label) || x.__autoLabel) { x.label = v === 'volume' ? 'Głośność' : v === 'mic' ? 'Mikrofon' : v.startsWith('target:') ? lbl.slice(0, 18) : x.label; }
+                }, { rerender: true });
+            };
         }
         if ($('wsPlayer')) $('wsPlayer').oninput = () => update((x) => { x.slider.player = $('wsPlayer').value.trim(); });
         if ($('wsVar')) $('wsVar').onclick = () => PD.pickVariable((n) => update((x) => { x.slider.var = n; }, { look: true }));

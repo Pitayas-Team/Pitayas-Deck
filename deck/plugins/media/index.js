@@ -4,6 +4,9 @@ let busy = false;
 
 const playerField = { key: 'player', label: 'Odtwarzacz', type: 'select', default: '', help: 'Puste = ten, który właśnie gra', options: async (ctx) => [{ value: '', label: 'Automatycznie (ten, który gra)' }, ...(await ctx.platform.listPlayers().catch(() => []))] };
 
+// Nazwa zmiennej z głośnością celu, np. app:spotify → vol_app_spotify
+const volVar = (t) => `vol_${String(t).replace(/[^\w]/g, '_')}`;
+
 async function poll(ctx) {
     if (busy) return;
     busy = true;
@@ -12,6 +15,13 @@ async function poll(ctx) {
         if (out && out.volume !== null) { ctx.setVariable('volume', out.volume); ctx.setVariable('muted', out.muted); }
         const mic = await ctx.platform.getVolume('source').catch(() => null);
         if (mic && mic.muted !== null) { ctx.setVariable('micMuted', mic.muted); ctx.setVariable('micVolume', mic.volume); }
+        // Głośność celów używanych przez suwaki i przyciski (np. słuchawki, Spotify, Discord) — zmienne media.vol_…
+        for (const t of (ctx.deck && ctx.deck.usedAudioTargets ? ctx.deck.usedAudioTargets() : [])) {
+            if (t === 'system' || t === 'mic') continue;
+            const v = await ctx.platform.getTargetVolume(t).catch(() => null);
+            if (v && v.volume !== null && v.volume !== undefined) ctx.setVariable(volVar(t), v.volume);
+            if (v && v.muted !== null && v.muted !== undefined) ctx.setVariable(`${volVar(t)}_muted`, v.muted);
+        }
         const np = await ctx.platform.nowPlaying(ctx.settings.player || '').catch(() => null);
         if (np) {
             ctx.setVariable('title', np.title);
@@ -131,8 +141,10 @@ module.exports = {
         },
         {
             id: 'volume',
-            name: 'Głośność systemu',
+            name: 'Głośność',
+            description: 'System, mikrofon, wybrane wyjście / wejście, aplikacja (Spotify, Discord, przeglądarka…) albo odtwarzacz',
             fields: [
+                { key: 'target', label: 'Czym sterować', type: 'select', default: 'system', options: async (ctx) => ctx.platform.audioTargets() },
                 { key: 'mode', label: 'Co zrobić', type: 'select', default: 'up', options: [
                     { value: 'up', label: 'Głośniej' }, { value: 'down', label: 'Ciszej' },
                     { value: 'set', label: 'Ustaw na' }, { value: 'mute', label: 'Wycisz / przywróć' },
@@ -141,7 +153,7 @@ module.exports = {
                 { key: 'value', label: 'Poziom dla „Ustaw na” (%)', type: 'number', default: 50 },
             ],
             run: async (c, ctx) => {
-                await ctx.platform.setVolume(c.mode, parseInt(c.step, 10) || 5, parseInt(c.value, 10) || 0);
+                await ctx.platform.setTargetVolume(c.target || 'system', c.mode, parseInt(c.step, 10) || 5, parseInt(c.value, 10) || 0);
                 await poll(ctx);
             },
         },
