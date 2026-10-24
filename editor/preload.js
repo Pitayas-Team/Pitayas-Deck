@@ -54,6 +54,8 @@ contextBridge.exposeInMainWorld('deck', {
     updateDevice: invoke('deck:device-update'),
     removeDevice: invoke('deck:device-remove'),
     qr: invoke('deck:qr'),
+    adminConfig: invoke('deck:admin-config'),
+    adminSet: invoke('deck:admin-set'),
     openUrl: invoke('deck:open-url'),
     maximize: () => ipcRenderer.send('deck:win-maximize'),
     quit: () => ipcRenderer.send('deck:quit'),

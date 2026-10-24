@@ -374,13 +374,55 @@
             $('fApproval2').checked = PD.data.deck.settings.requireApproval;
             $('fClock').checked = PD.data.deck.settings.showClock;
             $('fAutostart').value = PD.data.deck.settings.autostart || 'off';
-            $('importCard').hidden = !(await deck.macroDeckAvailable());
+            $('importCard').hidden = deck.isWebAdmin || !(await deck.macroDeckAvailable());
+            renderAdmin(await deck.adminConfig());
             deck.keyboardStatus().then((s) => {
                 const names = { uinput: 'wirtualna klawiatura (uinput)', ydotool: 'ydotool', xdotool: 'xdotool', wtype: 'wtype', windows: 'Windows' };
                 $('kbStatus').innerHTML = s.ok ? `<span class="t-ok">Działa — ${esc(names[s.backend] || s.backend)}</span>` : `<span class="t-err">${esc(s.error)}</span>`;
             });
         },
     };
+    // ── Panel w przeglądarce (/admin) ──
+    function renderAdmin(a) {
+        const web = Boolean(deck.isWebAdmin);
+        $('adminWebNote').hidden = !web;
+        $('fAdminOn').checked = a.enabled;
+        $('fAdminOn').disabled = web || !a.hasPassword;
+        $('fAdminOn').closest('.set-row').classList.toggle('set-dim', web || !a.hasPassword);
+        $('fAdminPass').closest('.set-row').classList.toggle('set-dim', web);
+        $('btnAdminLogout').closest('.set-row').classList.toggle('set-dim', web || !a.sessions);
+        $('adminPassHint').textContent = a.hasPassword
+            ? 'Hasło jest ustawione. Nowe hasło wylogowuje wszystkie przeglądarki'
+            : 'Najpierw ustaw hasło (co najmniej 6 znaków), potem włącz panel';
+        $('adminChip').textContent = a.enabled ? 'włączony' : 'wyłączony';
+        $('adminChip').classList.toggle('muted', !a.enabled);
+        $('adminSessions').textContent = a.sessions ? `Zalogowane: ${a.sessions}` : 'Nikt nie jest zalogowany';
+        $('adminUrlRow').hidden = !a.enabled;
+        $('adminUrls').innerHTML = a.urls.map((u) => `<span class="set-url">${esc(u)}<button data-copy="${esc(u)}" title="Kopiuj">${PD.icon('copy')}</button></span>`).join('') || '<span class="m-small">Serwer decka nie działa</span>';
+    }
+    async function adminSet(patch, okText) {
+        try {
+            renderAdmin(await deck.adminSet(patch));
+            if (okText) PD.toast(okText, 'success');
+        } catch (err) {
+            PD.toast(PD.errText(err), 'error');
+            renderAdmin(await deck.adminConfig());
+        }
+    }
+    $('fAdminOn').onchange = () => adminSet({ enabled: $('fAdminOn').checked }, $('fAdminOn').checked ? 'Panel w przeglądarce włączony' : 'Panel w przeglądarce wyłączony');
+    $('btnAdminPass').onclick = async () => {
+        const password = $('fAdminPass').value;
+        if (password.length < 6) return PD.toast('Hasło musi mieć co najmniej 6 znaków', 'error');
+        await adminSet({ password }, 'Zapisano hasło panelu');
+        $('fAdminPass').value = '';
+    };
+    $('fAdminPass').onkeydown = (e) => { if (e.key === 'Enter') $('btnAdminPass').click(); };
+    $('btnAdminLogout').onclick = () => adminSet({ logout: true }, 'Wylogowano wszystkie przeglądarki');
+    $('adminUrls').onclick = (e) => {
+        const b = e.target.closest('[data-copy]');
+        if (b) { deck.copyText(b.dataset.copy); PD.toast('Skopiowano adres', 'success'); }
+    };
+
     $('fPort').onchange = async () => { const res = await deck.settings({ port: parseInt($('fPort').value, 10) }); PD.data.server = res.server; PD.renderConnection(); PD.toast(`Serwer działa na porcie ${res.server.port}`, 'success'); };
     $('fApproval2').onchange = () => deck.settings({ requireApproval: $('fApproval2').checked });
     $('fClock').onchange = () => deck.settings({ showClock: $('fClock').checked });

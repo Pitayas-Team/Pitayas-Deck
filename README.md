@@ -40,6 +40,7 @@ Na telefonie nic nie instalujesz: zeskanuj kod QR z aplikacji na komputerze.
 - **Tryb JSON** — każdy widżet można edytować jako JSON.
 - **Sklep z dodatkami** — instalacja i aktualizacja bez restartu, ulubione akcje i widżety, możliwość podpięcia własnego katalogu dodatków.
 - **Import z Macro Deck** — foldery, przyciski, stany, suwaki, wskaźniki, odtwarzacz i ikony jednym kliknięciem (*Ustawienia → Przenieś deck z Macro Deck*).
+- **Panel w przeglądarce** — ten sam edytor z innego komputera w sieci pod adresem `http://<ip decka>:8191/admin`. Domyślnie wyłączony; włączasz go i ustawiasz hasło w *Ustawienia → Panel w przeglądarce* (tylko w aplikacji na komputerze).
 - **Własne wtyczki** — w `~/.config/Pitayas/Deck/data/plugins`, instrukcja w [docs/WTYCZKI.md](docs/WTYCZKI.md).
 
 ### [+] Wbudowane wtyczki
@@ -60,6 +61,10 @@ Na telefonie nic nie instalujesz: zeskanuj kod QR z aplikacji na komputerze.
 | **Home Assistant** | włącz / wyłącz urządzenia, jasność świateł, sceny i skrypty, dowolna usługa, stan encji jako zmienne |
 | **Minutnik** | odliczanie, stoper, pomodoro |
 | **Pogoda** | temperatura i prognoza (Open-Meteo, bez klucza) |
+| **Słuchawki Arctis** *(Linux)* | ANC / Transparency, mikrofon, sidetone, korektor, bateria — przez Pitaya Gear |
+| **Mysz G502** *(Linux)* | DPI, profile, kolor podświetlenia — przez Pitaya Gear |
+| **Klawiatura RGB** *(Linux)* | kolor i jasność klawiatury laptopa GIGABYTE — przez Pitaya Gear |
+| **Wentylatory GIGABYTE** *(Linux)* | tryby, Turbo, temperatury, limit baterii — przez Pitaya Gear |
 
 ### [+] Wymagania
 - Linux (Wayland albo X11) lub Windows. Telefon w tej samej sieci co komputer (albo w tej samej sieci Tailscale).

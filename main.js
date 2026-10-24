@@ -18,6 +18,7 @@ const { importMacroDeck, macroDeckDir } = require('./deck/import-macrodeck');
 const { createPluginStore } = require('./deck/plugin-store');
 const { createAutomations } = require('./deck/automations');
 const autostart = require('./deck/autostart');
+const { createAdmin } = require('./deck/admin-web');
 
 const ICON = path.join(__dirname, 'build', 'icons', '512x512.png');
 const log = (...a) => core.log.info(...a);
@@ -28,7 +29,17 @@ let isQuitting = false;
 
 const store = createStore(core.paths.data, log);
 const platform = createPlatform({ clipboard, shell, log });
-const toEditor = (channel, ...args) => { if (win && !win.isDestroyed()) win.webContents.send(channel, ...args); };
+// Obsługa poleceń edytora — wspólna dla okna (IPC) i panelu w przeglądarce (/admin)
+const handlers = new Map();
+function handle(channel, fn) {
+    handlers.set(channel, fn);
+    ipcMain.handle(channel, fn);
+}
+const admin = createAdmin({ appDir: __dirname, dataDir: core.paths.data, handlers, log });
+const toEditor = (channel, ...args) => {
+    if (win && !win.isDestroyed()) win.webContents.send(channel, ...args);
+    admin.broadcast(channel, ...args);
+};
 const runtime = createRuntime({
     store,
     userPluginsDir: path.join(core.paths.data, 'plugins'),
@@ -74,6 +85,7 @@ const automations = createAutomations({ store, runtime, log });
 const server = createServer({
     store,
     runtime,
+    admin,
     appDir: __dirname,
     log,
     onEvent: (type, data) => {
@@ -208,34 +220,34 @@ const snapshot = () => ({
     server: { port: server.port, urls: server.port ? server.urls() : [] },
     imagesDir: store.imagesDir,
 });
-ipcMain.handle('deck:get', () => snapshot());
-ipcMain.handle('deck:preview', (e, folderId) => server.folderState(folderId));
-ipcMain.handle('deck:render', (e, button, folderId, key) => server.renderButton(button, folderId, key));
-ipcMain.handle('deck:variables', () => runtime.listVariables());
+handle('deck:get', () => snapshot());
+handle('deck:preview', (e, folderId) => server.folderState(folderId));
+handle('deck:render', (e, button, folderId, key) => server.renderButton(button, folderId, key));
+handle('deck:variables', () => runtime.listVariables());
 
-ipcMain.handle('deck:set-button', (e, folderId, key, button) => store.setButton(folderId, key, button));
-ipcMain.handle('deck:move-button', (e, folderId, from, to) => store.moveButton(folderId, from, to));
-ipcMain.handle('deck:profile-add', (e, name) => store.addProfile(name));
-ipcMain.handle('deck:profile-update', (e, id, patch) => store.updateProfile(id, patch));
-ipcMain.handle('deck:profile-delete', (e, id) => store.deleteProfile(id));
-ipcMain.handle('deck:folder-add', (e, parentId, name) => store.addFolder(parentId, name));
-ipcMain.handle('deck:folder-rename', (e, id, name) => store.renameFolder(id, name));
-ipcMain.handle('deck:folder-delete', (e, id) => store.deleteFolder(id));
-ipcMain.handle('deck:folder-grid', (e, id, cols, rows) => store.folderGrid(id, cols, rows));
-ipcMain.handle('deck:set-state', (e, folderId, key, stateId) => store.setWidgetState(folderId, key, stateId));
+handle('deck:set-button', (e, folderId, key, button) => store.setButton(folderId, key, button));
+handle('deck:move-button', (e, folderId, from, to) => store.moveButton(folderId, from, to));
+handle('deck:profile-add', (e, name) => store.addProfile(name));
+handle('deck:profile-update', (e, id, patch) => store.updateProfile(id, patch));
+handle('deck:profile-delete', (e, id) => store.deleteProfile(id));
+handle('deck:folder-add', (e, parentId, name) => store.addFolder(parentId, name));
+handle('deck:folder-rename', (e, id, name) => store.renameFolder(id, name));
+handle('deck:folder-delete', (e, id) => store.deleteFolder(id));
+handle('deck:folder-grid', (e, id, cols, rows) => store.folderGrid(id, cols, rows));
+handle('deck:set-state', (e, folderId, key, stateId) => store.setWidgetState(folderId, key, stateId));
 
 // Ikony Lucide (ISC) dla wyszukiwarki w edytorze
 let lucideCache = null;
-ipcMain.handle('deck:lucide', () => {
+handle('deck:lucide', () => {
     if (!lucideCache) lucideCache = JSON.parse(fs.readFileSync(path.join(__dirname, 'shared', 'lucide.json'), 'utf8'));
     return lucideCache;
 });
 
 // Import z Macro Deck
-ipcMain.handle('deck:macrodeck-available', () => Boolean(macroDeckDir()));
-ipcMain.handle('deck:import-macrodeck', () => importMacroDeck(store, { log }));
+handle('deck:macrodeck-available', () => Boolean(macroDeckDir()));
+handle('deck:import-macrodeck', () => importMacroDeck(store, { log }));
 
-ipcMain.handle('deck:settings', async (e, patch) => {
+handle('deck:settings', async (e, patch) => {
     const s = store.setSettings(patch);
     if ('autostart' in patch) autostart.apply(s.autostart);
     // Zmiana portu: serwer startuje od nowa (telefony połączą się same po odświeżeniu adresu)
@@ -247,48 +259,48 @@ ipcMain.handle('deck:settings', async (e, patch) => {
 });
 
 // ───── Wtyczki i zmienne ─────
-ipcMain.handle('deck:plugin-settings', (e, id, patch) => runtime.setPluginSettings(id, patch));
-ipcMain.handle('deck:plugin-command', async (e, id, key) => { const r = await runtime.pluginCommand(id, key); return { result: r === undefined ? null : r, plugins: runtime.describe() }; });
+handle('deck:plugin-settings', (e, id, patch) => runtime.setPluginSettings(id, patch));
+handle('deck:plugin-command', async (e, id, key) => { const r = await runtime.pluginCommand(id, key); return { result: r === undefined ? null : r, plugins: runtime.describe() }; });
 runtime.onStatus(() => toEditor('deck:plugins', runtime.describe()));
-ipcMain.handle('deck:plugin-toggle', (e, id, disabled) => { runtime.setDisabled(id, disabled); return runtime.describe(); });
-ipcMain.handle('deck:field-options', (e, pluginId, actionId, key) => runtime.fieldOptions(pluginId, actionId, key));
-ipcMain.handle('deck:test-actions', async (e, actions) => {
+handle('deck:plugin-toggle', (e, id, disabled) => { runtime.setDisabled(id, disabled); return runtime.describe(); });
+handle('deck:field-options', (e, pluginId, actionId, key) => runtime.fieldOptions(pluginId, actionId, key));
+handle('deck:test-actions', async (e, actions) => {
     const errors = await runtime.runActions(actions, { device: 'editor', button: null, folderId: null });
     return { ok: !errors.length, errors };
 });
 // „Testuj” w edytorze: jak naciśnięcie na telefonie (ze zmianą stanu i kontekstem przycisku)
-ipcMain.handle('deck:test-button', async (e, folderId, key, phase = 'press') => {
+handle('deck:test-button', async (e, folderId, key, phase = 'press') => {
     const errors = await server.trigger('editor', folderId, key, phase);
     return { ok: !errors.length, errors };
 });
-ipcMain.handle('deck:test-slider', (e, folderId, key, value) => server.slider('editor', folderId, key, value));
-ipcMain.handle('deck:variable-set', (e, name, value, type) => runtime.setUserVariable(name, value, type));
-ipcMain.handle('deck:variable-delete', (e, name) => runtime.deleteUserVariable(name));
+handle('deck:test-slider', (e, folderId, key, value) => server.slider('editor', folderId, key, value));
+handle('deck:variable-set', (e, name, value, type) => runtime.setUserVariable(name, value, type));
+handle('deck:variable-delete', (e, name) => runtime.deleteUserVariable(name));
 // ───── Sklep z dodatkami ─────
-ipcMain.handle('deck:store-list', (e, force) => pluginStore.list(force));
-ipcMain.handle('deck:store-install', async (e, id) => { const r = await pluginStore.install(id); return { ...r, plugins: runtime.describe() }; });
-ipcMain.handle('deck:store-uninstall', async (e, id) => {
+handle('deck:store-list', (e, force) => pluginStore.list(force));
+handle('deck:store-install', async (e, id) => { const r = await pluginStore.install(id); return { ...r, plugins: runtime.describe() }; });
+handle('deck:store-uninstall', async (e, id) => {
     const used = usedPlugins().includes(id);
     const r = await pluginStore.uninstall(id);
     return { ...r, used, plugins: runtime.describe() };
 });
-ipcMain.handle('deck:store-update-all', async () => ({ updated: await pluginStore.updateAll(), plugins: runtime.describe() }));
-ipcMain.handle('deck:store-used', () => usedPlugins());
-ipcMain.handle('deck:store-url', (e, url) => { store.setSettings({ storeUrl: String(url || '').trim() }); return pluginStore.list(true); });
+handle('deck:store-update-all', async () => ({ updated: await pluginStore.updateAll(), plugins: runtime.describe() }));
+handle('deck:store-used', () => usedPlugins());
+handle('deck:store-url', (e, url) => { store.setSettings({ storeUrl: String(url || '').trim() }); return pluginStore.list(true); });
 // ───── Skrypty i automatyzacje ─────
-ipcMain.handle('deck:pin-report', (e, folderId, key) => server.pinReport(folderId, key));
-ipcMain.handle('deck:pin-relocate', (e, folderId, key) => server.relocateCovered(folderId, key));
-ipcMain.handle('deck:copy-text', (e, text) => { clipboard.writeText(String(text || '')); return true; });
-ipcMain.handle('deck:images', () => { try { return fs.readdirSync(store.imagesDir).filter((n) => /\.(png|jpe?g|webp|gif|svg)$/i.test(n)).sort(); } catch { return []; } });
-ipcMain.handle('deck:scripts-set', (e, list) => store.setScripts(list));
-ipcMain.handle('deck:automations-set', (e, list) => store.setAutomations(list));
-ipcMain.handle('deck:automation-run', async (e, id) => { await automations.run(id); return true; });
-ipcMain.handle('deck:open-plugins-dir', () => {
+handle('deck:pin-report', (e, folderId, key) => server.pinReport(folderId, key));
+handle('deck:pin-relocate', (e, folderId, key) => server.relocateCovered(folderId, key));
+handle('deck:copy-text', (e, text) => { clipboard.writeText(String(text || '')); return true; });
+handle('deck:images', () => { try { return fs.readdirSync(store.imagesDir).filter((n) => /\.(png|jpe?g|webp|gif|svg)$/i.test(n)).sort(); } catch { return []; } });
+handle('deck:scripts-set', (e, list) => store.setScripts(list));
+handle('deck:automations-set', (e, list) => store.setAutomations(list));
+handle('deck:automation-run', async (e, id) => { await automations.run(id); return true; });
+handle('deck:open-plugins-dir', () => {
     const dir = path.join(core.paths.data, 'plugins');
     fs.mkdirSync(dir, { recursive: true });
     return shell.openPath(dir);
 });
-ipcMain.handle('deck:keyboard-status', async () => {
+handle('deck:keyboard-status', async () => {
     try { return { ok: true, backend: await platform.keyboardBackend() }; } catch (err) { return { ok: false, error: err.message }; }
 });
 
@@ -300,7 +312,7 @@ runtime.onVariable(() => {
 });
 
 // ───── Pliki i obrazy ─────
-ipcMain.handle('deck:pick-file', async (e, { filters, image } = {}) => {
+handle('deck:pick-file', async (e, { filters, image } = {}) => {
     const res = await dialog.showOpenDialog(win, {
         properties: ['openFile'],
         filters: image ? [{ name: 'Obrazy', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'] }] : filters ? [{ name: 'Pliki', extensions: filters }, { name: 'Wszystkie', extensions: ['*'] }] : [],
@@ -312,18 +324,25 @@ ipcMain.handle('deck:pick-file', async (e, { filters, image } = {}) => {
     if (buf.length > 4 * 1024 * 1024) throw new Error('Obraz jest za duży (maks. 4 MB)');
     return store.saveImage(buf, path.extname(file).slice(1));
 });
-ipcMain.handle('deck:save-image-data', (e, dataUrl) => {
+handle('deck:save-image-data', (e, dataUrl) => {
     const m = /^data:image\/(\w+);base64,(.+)$/.exec(dataUrl || '');
     if (!m) throw new Error('Niepoprawny obraz');
     return store.saveImage(Buffer.from(m[2], 'base64'), m[1] === 'jpeg' ? 'jpg' : m[1]);
 });
-ipcMain.handle('deck:export', async () => {
+// Kopia zapasowa jako dane — dla panelu w przeglądarce (pobieranie / wczytanie pliku po stronie przeglądarki)
+handle('deck:export-data', () => store.exportDeck());
+handle('deck:import-data', (e, data) => {
+    if (!data || typeof data !== 'object') throw new Error('To nie jest plik Pitaya Deck');
+    store.importDeck(data);
+    return snapshot();
+});
+handle('deck:export', async () => {
     const res = await dialog.showSaveDialog(win, { defaultPath: 'pitaya-deck.json', filters: [{ name: 'Pitaya Deck', extensions: ['json'] }] });
     if (res.canceled || !res.filePath) return false;
     fs.writeFileSync(res.filePath, JSON.stringify(store.exportDeck(), null, 2));
     return res.filePath;
 });
-ipcMain.handle('deck:import', async () => {
+handle('deck:import', async () => {
     const res = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: [{ name: 'Pitaya Deck', extensions: ['json'] }] });
     if (res.canceled || !res.filePaths.length) return false;
     store.importDeck(JSON.parse(fs.readFileSync(res.filePaths[0], 'utf8')));
@@ -331,8 +350,8 @@ ipcMain.handle('deck:import', async () => {
 });
 
 // ───── Urządzenia ─────
-ipcMain.handle('deck:approve', (e, id, approved) => server.approve(id, approved));
-ipcMain.handle('deck:device-update', (e, id, patch) => {
+handle('deck:approve', (e, id, approved) => server.approve(id, approved));
+handle('deck:device-update', (e, id, patch) => {
     const clean = {};
     if (patch.name) { clean.name = String(patch.name).slice(0, 60); clean.customName = true; }
     if (patch.profile) clean.profile = patch.profile;
@@ -340,6 +359,17 @@ ipcMain.handle('deck:device-update', (e, id, patch) => {
     if (clean.profile) server.deckApi.switchProfile(id, clean.profile);
     return server.devicesList();
 });
-ipcMain.handle('deck:device-remove', (e, id) => { server.removeDevice(id); return server.devicesList(); });
-ipcMain.handle('deck:qr', async (e, text) => require('qrcode').toDataURL(text, { margin: 1, width: 360, color: { dark: '#17161c', light: '#ffffff' } }));
-ipcMain.handle('deck:open-url', (e, url) => { if (/^http:\/\/[\d.]+:\d+\/?$/.test(url)) shell.openExternal(url); });
+handle('deck:device-remove', (e, id) => { server.removeDevice(id); return server.devicesList(); });
+handle('deck:qr', async (e, text) => require('qrcode').toDataURL(text, { margin: 1, width: 360, color: { dark: '#17161c', light: '#ffffff' } }));
+handle('deck:open-url', (e, url) => { if (/^http:\/\/[\d.]+:\d+\/?$/.test(url)) shell.openExternal(url); });
+
+// ───── Panel w przeglądarce (/admin) ─────
+handle('deck:app-info', () => ({ id: 'deck', name: 'Pitaya Deck', version: app.getVersion(), coreVersion: require('./core').CORE_VERSION, dataDir: core.paths.dir, repoUrl: 'https://github.com/Pitayas-Team/Pitayas-Deck' }));
+const adminInfo = () => ({ ...admin.status(), urls: server.port ? server.urls().map((u) => `${u.url}/admin`) : [] });
+handle('deck:admin-config', () => adminInfo());
+// Włączanie i hasło tylko z aplikacji na komputerze — nie z samego panelu
+handle('deck:admin-set', (e, patch) => {
+    if (e && e.web) throw new Error('Panel zmienisz tylko w aplikacji na komputerze');
+    admin.set(patch || {});
+    return adminInfo();
+});

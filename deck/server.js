@@ -61,7 +61,7 @@ function ruleMatches(rule, get) {
     }
 }
 
-function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
+function createServer({ store, runtime, admin = null, appDir, log, onEvent = () => {} }) {
     const sessions = new Map();   // ws → { deviceId, folderId, approved }
     let server = null;
     let wss = null;
@@ -89,6 +89,11 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
             const allowed = [runtime.getVariable('media.artUrl'), ...deckApi.usedMediaPlayers().map((pl) => runtime.getVariable(`media.pl_${String(pl).replace(/[^\w]/g, '_')}_artUrl`))].map((x) => String(x || ''));
             if (!allowed.some((c) => c.startsWith('file://') && decodeURIComponent(c.slice(7)) === f) || !/\.(png|jpe?g|webp|gif)$/i.test(f)) { res.writeHead(404); res.end(); return; }
             return serveFile(res, f);
+        }
+        // Panel edytora w przeglądarce (deck/admin-web.js) — ma własne logowanie
+        if (admin && (p === '/admin' || p.startsWith('/admin/'))) {
+            admin.handle(req, res, url, p).catch((err) => { log('Panel /admin:', err.message); try { res.writeHead(500); res.end(); } catch {} });
+            return;
         }
         const plug = p.match(/^\/p\/([\w-]+)(\/.*)?$/);
         if (plug) return runtime.pluginHttp(plug[1], req, res, url);
@@ -571,7 +576,14 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
                 ws.on('close', () => { sessions.delete(ws); emitDevices(); });
                 ws.on('error', () => {});
             });
-            server.once('error', reject);
+            // WebSocketServer powtarza błędy serwera HTTP (np. zajęty port) — bez tej obsługi byłyby
+            // nieobsłużonym wyjątkiem i deck nie spróbowałby kolejnego portu
+            wss.on('error', () => {});
+            server.once('error', (err) => {
+                try { wss.close(); } catch {}
+                server = null; wss = null;
+                reject(err);
+            });
             server.listen(p, '0.0.0.0', () => { port = p; log(`Serwer decka na porcie ${p}`); resolve(p); });
         });
     }

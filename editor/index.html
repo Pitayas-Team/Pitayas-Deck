@@ -26,6 +26,7 @@
       <div class="m-update-pill" id="updatePill" title="Dostępna aktualizacja">Aktualizacja</div>
       <button class="m-win-btn" id="btnSettings" title="Ustawienia" hidden></button>
       <div class="m-win-sep"></div>
+      <form class="web-only" method="post" action="/admin/logout"><button class="m-btn small" type="submit" title="Wyloguj z panelu"><span data-i="log-out"></span>Wyloguj</button></form>
       <button class="m-win-btn" data-win="min" title="Minimalizuj"><svg viewBox="0 0 12 12"><path d="M1 6.5h10"/></svg></button>
       <button class="m-win-btn" id="btnMax" title="Maksymalizuj"><svg viewBox="0 0 12 12"><rect x="1.5" y="1.5" width="9" height="9"/></svg></button>
       <button class="m-win-btn close" data-win="close" title="Schowaj do zasobnika (deck działa dalej)"><svg viewBox="0 0 12 12"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9"/></svg></button>
@@ -204,40 +205,54 @@
       <!-- ───── USTAWIENIA ───── -->
       <section class="page page-list" data-page="settings" hidden>
         <div class="list-head"><div><h1>Ustawienia</h1></div></div>
-        <div class="set-grid">
+        <div class="settings">
           <div class="card import-card" id="importCard" hidden>
             <span class="ic-ico" data-i="import"></span>
             <div><b>Przenieś deck z Macro Deck</b><div class="m-small">Foldery, przyciski ze stanami, suwaki, zegar, wskaźniki, odtwarzacz i ikony trafią do nowego profilu. Macro Deck zostaje bez zmian.</div><div class="m-small" id="importResult"></div></div>
             <button class="m-btn small accent" id="btnImportMd">Importuj</button>
           </div>
-          <div class="card">
-            <h3>Połączenie</h3>
-            <div class="m-field"><label class="m-label">Port serwera</label><input class="m-input" id="fPort" type="number" min="1024" max="65535"></div>
-            <label class="check"><input type="checkbox" id="fApproval2"> Pytaj o zgodę przy nowym urządzeniu</label>
-            <label class="check"><input type="checkbox" id="fClock"> Pokazuj zegar na pasku telefonu</label>
-          </div>
-          <div class="card">
-            <h3>Uruchamianie</h3>
-            <div class="m-field"><label class="m-label" for="fAutostart">Przy starcie systemu</label>
-              <select class="m-input" id="fAutostart">
+
+          <section class="set-sec">
+            <header><span class="set-ico" data-i="wifi"></span><div><h3>Połączenie</h3><p>Jak telefony i tablety łączą się z deckiem</p></div></header>
+            <div class="set-row"><div><b>Port serwera</b><small>Zmiana restartuje serwer — telefony połączą się same po odświeżeniu</small></div><input class="m-input set-num" id="fPort" type="number" min="1024" max="65535"></div>
+            <label class="set-row"><div><b>Pytaj o zgodę przy nowym urządzeniu</b><small>Nowy telefon czeka, aż zatwierdzisz go na komputerze</small></div><input type="checkbox" class="switch" id="fApproval2"></label>
+            <label class="set-row"><div><b>Zegar na pasku telefonu</b><small>Godzina w górnym pasku decka</small></div><input type="checkbox" class="switch" id="fClock"></label>
+          </section>
+
+          <section class="set-sec" id="adminSec">
+            <header><span class="set-ico" data-i="globe"></span><div><h3>Panel w przeglądarce</h3><p>Ten edytor z dowolnego komputera w sieci, pod adresem <code>…/admin</code></p></div><span class="m-chip muted" id="adminChip">wyłączony</span></header>
+            <div class="set-note" id="adminWebNote" hidden><span data-i="lock"></span>Ustawienia panelu zmienisz tylko w aplikacji na komputerze.</div>
+            <label class="set-row"><div><b>Włącz panel /admin</b><small>Wymaga hasła. Daje pełną kontrolę nad deckiem — włączaj tylko w zaufanej sieci</small></div><input type="checkbox" class="switch" id="fAdminOn"></label>
+            <div class="set-row"><div><b>Hasło</b><small id="adminPassHint">Co najmniej 6 znaków. Zmiana wylogowuje wszystkie przeglądarki</small></div>
+              <div class="set-ctl"><input class="m-input" id="fAdminPass" type="password" placeholder="Nowe hasło" autocomplete="new-password"><button class="m-btn small" id="btnAdminPass">Zapisz</button></div></div>
+            <div class="set-row" id="adminUrlRow"><div><b>Adres panelu</b><small>Otwórz w przeglądarce na innym komputerze</small></div><div class="set-urls" id="adminUrls"></div></div>
+            <div class="set-row"><div><b>Zalogowane przeglądarki</b><small id="adminSessions">—</small></div><button class="m-btn small" id="btnAdminLogout"><span data-i="log-out"></span>Wyloguj wszystkie</button></div>
+          </section>
+
+          <section class="set-sec">
+            <header><span class="set-ico" data-i="rocket"></span><div><h3>Uruchamianie</h3><p>Co dzieje się po włączeniu komputera</p></div></header>
+            <div class="set-row"><div><b>Przy starcie systemu</b><small>W tle deck od razu przyjmuje połączenia, a okno otworzysz ikoną w zasobniku</small></div>
+              <select class="m-input set-sel" id="fAutostart">
                 <option value="off">Nie uruchamiaj</option>
                 <option value="window">Z otwartym oknem</option>
-                <option value="background">W tle (tylko ikona w zasobniku)</option>
+                <option value="background">W tle (zasobnik)</option>
               </select></div>
-            <div class="m-small">W tle Pitaya Deck od razu przyjmuje połączenia z telefonów, a okno otworzysz ikoną w zasobniku.</div>
-          </div>
-          <div class="card">
-            <h3>Klawiatura</h3>
-            <div class="m-small" id="kbStatus">Sprawdzanie…</div>
-            <div class="m-small">Skróty i wpisywanie tekstu działają przez wirtualną klawiaturę (Linux: uinput, ydotool, xdotool albo wtype).</div>
-          </div>
-          <div class="card">
-            <h3>Kopia zapasowa</h3>
-            <div class="row-btns"><button class="m-btn small" id="btnExport">Eksportuj deck…</button><button class="m-btn small" id="btnImport">Importuj deck…</button></div>
-            <div class="row-btns"><button class="m-btn small" id="btnPluginsDir">Otwórz folder wtyczek</button></div>
-          </div>
+          </section>
+
+          <section class="set-sec">
+            <header><span class="set-ico" data-i="keyboard"></span><div><h3>Klawiatura</h3><p>Skróty i wpisywanie tekstu z przycisków</p></div></header>
+            <div class="set-row"><div><b>Wirtualna klawiatura</b><small>Linux: uinput, ydotool, xdotool albo wtype</small></div><div class="set-status" id="kbStatus">Sprawdzanie…</div></div>
+          </section>
+
+          <section class="set-sec">
+            <header><span class="set-ico" data-i="archive"></span><div><h3>Kopia zapasowa i pliki</h3><p>Profile, foldery i przyciski w jednym pliku</p></div></header>
+            <div class="set-row"><div><b>Kopia decka</b><small>Import zastępuje wszystkie profile, foldery i przyciski</small></div><div class="set-ctl"><button class="m-btn small" id="btnExport">Eksportuj…</button><button class="m-btn small" id="btnImport">Importuj…</button></div></div>
+            <div class="set-row desktop-only"><div><b>Folder wtyczek</b><small>Własne wtyczki wrzucasz tutaj</small></div><button class="m-btn small" id="btnPluginsDir"><span data-i="folder-open"></span>Otwórz</button></div>
+          </section>
+
           <!-- O programie i aktualizacje (Pitaya Core: identyfikatory wymagane przez pitaya-ui.js) -->
-          <div class="card wide" id="modalSettings">
+          <section class="set-sec" id="modalSettings">
+            <header><span class="set-ico" data-i="info"></span><div><h3>O programie</h3><p>Wersja, aktualizacje i dane</p></div></header>
             <div class="m-about">
               <img src="../build/icons/128x128.png" alt="">
               <div>
@@ -246,7 +261,7 @@
                 <div class="m-small">Wersja: <span id="appVersionText">—</span></div>
               </div>
             </div>
-            <div class="m-update-card">
+            <div class="m-update-card desktop-only">
               <div class="m-update-head">
                 <div>
                   <div class="m-update-title">Aktualizacje z GitHub</div>
@@ -262,14 +277,10 @@
                 </div>
               </div>
             </div>
-            <div class="m-field">
-              <span class="m-label">Folder danych (Pitaya Core)</span>
-              <div class="data-row"><code id="dataDirText">—</code><button class="m-btn small" id="btnOpenDataDir">Otwórz</button></div>
-            </div>
-            <div class="m-small">Ikony: Lucide (licencja ISC, © Lucide Icons and Contributors).</div>
-            <div class="m-small">Repozytorium: <a class="m-link" id="repoLink" href="#">github.com/Pitayas-Team/Pitayas-Deck</a></div>
-            <div class="row-btns"><button class="m-btn small danger" id="btnQuit">Zakończ Pitaya Deck</button></div>
-          </div>
+            <div class="set-row desktop-only"><div><b>Folder danych</b><small><code id="dataDirText">—</code></small></div><button class="m-btn small" id="btnOpenDataDir">Otwórz</button></div>
+            <div class="m-small">Ikony: Lucide (licencja ISC, © Lucide Icons and Contributors). Repozytorium: <a class="m-link" id="repoLink" href="#">github.com/Pitayas-Team/Pitayas-Deck</a></div>
+            <div class="row-btns desktop-only"><button class="m-btn small danger" id="btnQuit"><span data-i="power"></span>Zakończ Pitaya Deck</button></div>
+          </section>
         </div>
       </section>
     </main>
