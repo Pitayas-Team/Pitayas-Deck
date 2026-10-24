@@ -97,7 +97,9 @@
         grid.style.setProperty('--pd-radius', `${Math.round((cell * (state.style.radius ?? 22)) / 100)}px`);
         grid.style.gridTemplateColumns = `repeat(${cols}, ${cell}px)`;
         grid.style.gridTemplateRows = `repeat(${rows}, ${cell}px)`;
-        document.body.style.background = state.style.background || '';
+        // Tło decka: kolor profilu, z różowym gradientem albo bez (Ustawienia siatki → Gradient tła)
+        const bg = state.style.background || 'var(--bg)';
+        document.body.style.background = state.style.gradient === false ? bg : `radial-gradient(700px 400px at 100% -10%, rgba(255,60,160,0.16), transparent 70%), ${bg}`;
         grid.classList.toggle('empty-hidden', state.style.emptyCells === 'transparent');
         cellSize = cell;
         return cell;

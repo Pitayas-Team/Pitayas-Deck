@@ -113,6 +113,7 @@ function createStore(dataDir, log = () => {}) {
             if (patch.spacing !== undefined) p.spacing = Math.max(0, Math.min(40, parseInt(patch.spacing, 10) || 0));
             if (patch.radius !== undefined) p.radius = Math.max(0, Math.min(50, parseInt(patch.radius, 10) || 0));
             if (patch.background !== undefined) p.background = String(patch.background || '');
+            if (patch.gradient !== undefined) p.gradient = Boolean(patch.gradient);
             if (Array.isArray(patch.favorites)) p.favorites = patch.favorites.filter((id) => deck.folders[id]);
             if (patch.emptyCells !== undefined) p.emptyCells = patch.emptyCells === 'transparent' ? 'transparent' : 'visible';
             changed('profiles');

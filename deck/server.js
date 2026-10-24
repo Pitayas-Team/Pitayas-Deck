@@ -303,7 +303,7 @@ function createServer({ store, runtime, appDir, log, onEvent = () => {} }) {
         return {
             t: 'state',
             profile: { id: profile.id, name: profile.name, cols: grid.cols, rows: grid.rows },
-            style: { spacing: profile.spacing ?? 10, radius: profile.radius ?? 22, background: profile.background || '', emptyCells: profile.emptyCells || 'visible' },
+            style: { spacing: profile.spacing ?? 10, radius: profile.radius ?? 22, background: profile.background || '', gradient: profile.gradient !== false, emptyCells: profile.emptyCells || 'visible' },
             folder: { id: folder ? folder.id : null, name: folder ? folder.name : '', canBack: Boolean(folder && folder.parent) },
             buttons,
             device: device ? { id: device.id, name: device.name } : null,

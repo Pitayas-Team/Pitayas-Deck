@@ -44,7 +44,7 @@
         grid.style.gridTemplateColumns = `repeat(${cols}, ${cell}px)`;
         grid.style.gridTemplateRows = `repeat(${rows}, ${cell}px)`;
         grid.classList.toggle('empty-hidden', state.style.emptyCells === 'transparent');
-        $('stage').style.background = state.style.background || '';
+        $('stage').style.background = state.style.gradient === false ? (state.style.background || '') : `radial-gradient(520px 300px at 100% -10%, rgba(255,60,160,0.16), transparent 70%), ${state.style.background || 'transparent'}`;
         grid.innerHTML = '';
         const covered = new Set();
         const items = [];
@@ -341,6 +341,7 @@
         $('gpGap').value = p.spacing ?? 10; $('gpGapVal').textContent = `${p.spacing ?? 10}%`;
         $('gpRad').value = p.radius ?? 22; $('gpRadVal').textContent = `${p.radius ?? 22}%`;
         $('gpEmpty').querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.v === (p.emptyCells || 'visible')));
+        $('gpGrad').querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.v === String(p.gradient !== false)));
         PD.colorRow($('gpBg'), ['', '#121116', '#000000', '#17161c', '#1e1b2e', '#2a0f1f', '#0f1d2a'], p.background || '', async (c) => { await deck.updateProfile(p.id, { background: c }); await PD.reload(); renderGrid(); }, true);
     }
     let gpTimer = null;
@@ -355,6 +356,7 @@
     });
     $('gpGap').oninput = () => { $('gpGapVal').textContent = `${$('gpGap').value}%`; gpChange(() => deck.updateProfile(PD.profileId, { spacing: $('gpGap').value })); };
     $('gpRad').oninput = () => { $('gpRadVal').textContent = `${$('gpRad').value}%`; gpChange(() => deck.updateProfile(PD.profileId, { radius: $('gpRad').value })); };
+    $('gpGrad').onclick = (e) => { const b = e.target.closest('[data-v]'); if (b) gpChange(() => deck.updateProfile(PD.profileId, { gradient: b.dataset.v === 'true' })); };
     $('gpEmpty').onclick = (e) => { const b = e.target.closest('[data-v]'); if (b) gpChange(() => deck.updateProfile(PD.profileId, { emptyCells: b.dataset.v })); };
 
     // ───── Drzewo folderów ─────
