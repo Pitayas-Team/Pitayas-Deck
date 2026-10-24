@@ -1,14 +1,14 @@
 {
   "id": "gear-mouse",
   "name": "Mysz G502",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "Pitayas",
   "license": "MIT",
   "icon": "mouse",
   "color": "#c77dff",
   "category": "system",
-  "description": "Logitech G502: DPI, profile i kolor podświetlenia.",
-  "longDescription": "Steruje myszą Logitech G502 HERO przez aplikację Pitaya Gear: przełączanie poziomów DPI, profili zapisanych w myszy i podświetlenia (OpenRGB). Wymaga Pitaya Gear.",
+  "description": "Logitech G502: DPI, profile i kolor podświetlenia (tylko Linux).",
+  "longDescription": "Steruje myszą Logitech G502 HERO przez aplikację Pitaya Gear: przełączanie poziomów DPI, profili zapisanych w myszy i podświetlenia (OpenRGB). Wymaga Pitaya Gear. Działa tylko na Linuksie (sprzęt obsługuje Pitaya Gear, które jest aplikacją linuksową).",
   "features": [
     "Następny / poprzedni poziom DPI albo dokładna wartość",
     "Przełączanie profili",
@@ -21,9 +21,14 @@
     "g502",
     "dpi",
     "rgb",
-    "pitaya gear"
+    "pitaya gear",
+    "linux"
   ],
   "changelog": [
+    {
+      "version": "1.0.1",
+      "notes": "Oznaczenie: dodatek działa tylko na Linuksie. Na innych systemach pokazuje czytelny komunikat."
+    },
     {
       "version": "1.0.0",
       "notes": "Pierwsza wersja — współpracuje z Pitaya Gear."

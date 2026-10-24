@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-24T19:39:02.057Z",
+  "generatedAt": "2026-10-24T19:57:54.217Z",
   "plugins": [
     {
       "id": "discord",
@@ -54,14 +54,14 @@
     {
       "id": "gear-fans",
       "name": "Wentylatory GIGABYTE",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "author": "Pitayas",
       "license": "MIT",
       "icon": "fan",
       "color": "#4cc38a",
       "category": "system",
-      "description": "Tryby wentylatorów, Turbo, temperatury CPU/GPU i limit baterii.",
-      "longDescription": "Przełącza tryby wentylatorów laptopa GIGABYTE (Auto, Cichy, Normalny, Gaming) i Turbo przez aplikację Pitaya Gear. Temperatury i obroty CPU/GPU są dostępne jako zmienne, np. {gear-fans.cpuTemp}°. Wymaga Pitaya Gear ze sterownikiem gigabyte-laptop-wmi.",
+      "description": "Tryby wentylatorów, Turbo, temperatury CPU/GPU i limit baterii (tylko Linux).",
+      "longDescription": "Przełącza tryby wentylatorów laptopa GIGABYTE (Auto, Cichy, Normalny, Gaming) i Turbo przez aplikację Pitaya Gear. Temperatury i obroty CPU/GPU są dostępne jako zmienne, np. {gear-fans.cpuTemp}°. Wymaga Pitaya Gear ze sterownikiem gigabyte-laptop-wmi. Działa tylko na Linuksie (sprzęt obsługuje Pitaya Gear, które jest aplikacją linuksową).",
       "features": [
         "Tryb wentylatorów lub następny tryb",
         "Turbo włącz / wyłącz",
@@ -73,9 +73,14 @@
         "temperatura",
         "gigabyte",
         "chłodzenie",
-        "pitaya gear"
+        "pitaya gear",
+        "linux"
       ],
       "changelog": [
+        {
+          "version": "1.0.1",
+          "notes": "Oznaczenie: dodatek działa tylko na Linuksie. Na innych systemach pokazuje czytelny komunikat."
+        },
         {
           "version": "1.0.0",
           "notes": "Pierwsza wersja — współpracuje z Pitaya Gear."
@@ -84,27 +89,27 @@
       "files": [
         {
           "path": "index.js",
-          "size": 7117,
-          "sha256": "7571251b48e77cfa0773ec5342ebf7c2f297f95b628ce49282fef4e7d9fd714b"
+          "size": 7244,
+          "sha256": "8fd365257442505b72698e06a24cf2bf6aa5939e68168ecba02d59f4f5352ff8"
         },
         {
           "path": "plugin.json",
-          "size": 960,
-          "sha256": "832b555772c6fe7355800358cb2855c16ab7afb2788a495b7e16fb67a00d2410"
+          "size": 1234,
+          "sha256": "f3efbb7b94c781e63e6831a268eb9a968a13725b22580d5c453476d81d087fba"
         }
       ]
     },
     {
       "id": "gear-headset",
       "name": "Słuchawki Arctis",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "author": "Pitayas",
       "license": "MIT",
       "icon": "headphones",
       "color": "#ff4fa6",
       "category": "system",
-      "description": "Arctis Nova Pro Omni: ANC, mikrofon, sidetone, korektor i bateria.",
-      "longDescription": "Steruje słuchawkami SteelSeries Arctis Nova Pro Omni przez aplikację Pitaya Gear. Bateria i tryb redukcji szumów są dostępne jako zmienne, np. {gear-headset.batteryText}. Wymaga Pitaya Gear — wtyczka uruchomi go w tle, jeśli nie działa.",
+      "description": "Arctis Nova Pro Omni: ANC, mikrofon, sidetone, korektor i bateria (tylko Linux).",
+      "longDescription": "Steruje słuchawkami SteelSeries Arctis Nova Pro Omni przez aplikację Pitaya Gear. Bateria i tryb redukcji szumów są dostępne jako zmienne, np. {gear-headset.batteryText}. Wymaga Pitaya Gear — wtyczka uruchomi go w tle, jeśli nie działa. Działa tylko na Linuksie (sprzęt obsługuje Pitaya Gear, które jest aplikacją linuksową).",
       "features": [
         "Przełączanie ANC / Transparency",
         "Głośność mikrofonu (także suwakiem)",
@@ -118,9 +123,14 @@
         "arctis",
         "anc",
         "mikrofon",
-        "pitaya gear"
+        "pitaya gear",
+        "linux"
       ],
       "changelog": [
+        {
+          "version": "1.0.1",
+          "notes": "Oznaczenie: dodatek działa tylko na Linuksie. Na innych systemach pokazuje czytelny komunikat."
+        },
         {
           "version": "1.0.0",
           "notes": "Pierwsza wersja — współpracuje z Pitaya Gear."
@@ -129,27 +139,27 @@
       "files": [
         {
           "path": "index.js",
-          "size": 8176,
-          "sha256": "fe412c0e2469780c435e615ca13d30a7d4b2e191152e7b9aedcb001386d5c6a5"
+          "size": 8303,
+          "sha256": "8052333ded32e5aaa3a2fa39b319eb3b040525451a3e8fd4cd2f3e4c180c6d46"
         },
         {
           "path": "plugin.json",
-          "size": 1028,
-          "sha256": "8760205156f47316f3fbc90305dfe7dfd70dfb6968d8bac166802bfe5f3bbe2b"
+          "size": 1302,
+          "sha256": "2b7b110a92b2b96a63fb90f6e110c42a19723302f1f04e61b79ebd224118a6ca"
         }
       ]
     },
     {
       "id": "gear-keyboard",
       "name": "Klawiatura RGB",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "author": "Pitayas",
       "license": "MIT",
       "icon": "keyboard",
       "color": "#4ea8ff",
       "category": "system",
-      "description": "Kolor i jasność podświetlenia klawiatury laptopa GIGABYTE.",
-      "longDescription": "Ustawia kolor i jasność podświetlenia klawiatury laptopa GIGABYTE (HID LampArray) przez aplikację Pitaya Gear. Wymaga Pitaya Gear.",
+      "description": "Kolor i jasność podświetlenia klawiatury laptopa GIGABYTE (tylko Linux).",
+      "longDescription": "Ustawia kolor i jasność podświetlenia klawiatury laptopa GIGABYTE (HID LampArray) przez aplikację Pitaya Gear. Wymaga Pitaya Gear. Działa tylko na Linuksie (sprzęt obsługuje Pitaya Gear, które jest aplikacją linuksową).",
       "features": [
         "Dowolny kolor #rrggbb",
         "Jaśniej / ciemniej / włącz-wyłącz (także suwakiem)",
@@ -161,9 +171,14 @@
         "rgb",
         "gigabyte",
         "podświetlenie",
-        "pitaya gear"
+        "pitaya gear",
+        "linux"
       ],
       "changelog": [
+        {
+          "version": "1.0.1",
+          "notes": "Oznaczenie: dodatek działa tylko na Linuksie. Na innych systemach pokazuje czytelny komunikat."
+        },
         {
           "version": "1.0.0",
           "notes": "Pierwsza wersja — współpracuje z Pitaya Gear."
@@ -172,27 +187,27 @@
       "files": [
         {
           "path": "index.js",
-          "size": 7222,
-          "sha256": "4914714cfad17582ab669c398e5029acb4b5b997aeedf9fe8c915eb2db6d5eac"
+          "size": 7349,
+          "sha256": "f771b131ad05cd5f982023ca7332f82b815ff76b383797b351ec5ff5ee8a313e"
         },
         {
           "path": "plugin.json",
-          "size": 848,
-          "sha256": "adc427e9f02855c8edad109325f008518112fe3a7b4a60694727e159060ca027"
+          "size": 1122,
+          "sha256": "a6a127dfe63b8078c06a1656fb41b2b5678fbf173184cf22f8b7dc58dc64e78c"
         }
       ]
     },
     {
       "id": "gear-mouse",
       "name": "Mysz G502",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "author": "Pitayas",
       "license": "MIT",
       "icon": "mouse",
       "color": "#c77dff",
       "category": "system",
-      "description": "Logitech G502: DPI, profile i kolor podświetlenia.",
-      "longDescription": "Steruje myszą Logitech G502 HERO przez aplikację Pitaya Gear: przełączanie poziomów DPI, profili zapisanych w myszy i podświetlenia (OpenRGB). Wymaga Pitaya Gear.",
+      "description": "Logitech G502: DPI, profile i kolor podświetlenia (tylko Linux).",
+      "longDescription": "Steruje myszą Logitech G502 HERO przez aplikację Pitaya Gear: przełączanie poziomów DPI, profili zapisanych w myszy i podświetlenia (OpenRGB). Wymaga Pitaya Gear. Działa tylko na Linuksie (sprzęt obsługuje Pitaya Gear, które jest aplikacją linuksową).",
       "features": [
         "Następny / poprzedni poziom DPI albo dokładna wartość",
         "Przełączanie profili",
@@ -205,9 +220,14 @@
         "g502",
         "dpi",
         "rgb",
-        "pitaya gear"
+        "pitaya gear",
+        "linux"
       ],
       "changelog": [
+        {
+          "version": "1.0.1",
+          "notes": "Oznaczenie: dodatek działa tylko na Linuksie. Na innych systemach pokazuje czytelny komunikat."
+        },
         {
           "version": "1.0.0",
           "notes": "Pierwsza wersja — współpracuje z Pitaya Gear."
@@ -216,13 +236,13 @@
       "files": [
         {
           "path": "index.js",
-          "size": 6952,
-          "sha256": "f41a055965c4827e5a31cfc68f9af115bdbb6b182d04ff693d5404e24cec42b4"
+          "size": 7079,
+          "sha256": "ff0d0d70b4f9f329f292fde10a345c75a595269ee4e999ae3c882428a351cfbc"
         },
         {
           "path": "plugin.json",
-          "size": 853,
-          "sha256": "2608ff2ab653f902448e1303115079d8e6575eaf6e3e4eeedacb41dd8cce6373"
+          "size": 1127,
+          "sha256": "73e3e9b8e923bbad1b00a5396b0f4d8a318a8e072d439f711075c0aa8011bbaa"
         }
       ]
     },

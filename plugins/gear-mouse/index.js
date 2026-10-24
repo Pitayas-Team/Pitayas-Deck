@@ -14,6 +14,7 @@ const PITAYAS = process.env.PITAYAS_HOME || (process.platform === 'win32'
 const SOCKET = process.platform === 'win32' ? '\\\\.\\pipe\\pitayas-gear' : path.join(PITAYAS, 'run', 'gear.sock');
 
 function send(cmd, args = {}, timeout = 15000) {
+    if (process.platform !== 'linux') return Promise.reject(new Error('Ten dodatek działa tylko na Linuksie (Pitaya Gear)'));
     return new Promise((resolve, reject) => {
         const sock = net.createConnection(SOCKET);
         let buf = '';
