@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-22T19:03:22.198Z",
+  "generatedAt": "2026-10-24T19:39:02.057Z",
   "plugins": [
     {
       "id": "discord",
@@ -48,6 +48,181 @@
           "path": "plugin.json",
           "size": 1110,
           "sha256": "823bb9359208b0ac38c38ed6339c3beb950129a342a9806eb4194ebd1647d19d"
+        }
+      ]
+    },
+    {
+      "id": "gear-fans",
+      "name": "Wentylatory GIGABYTE",
+      "version": "1.0.0",
+      "author": "Pitayas",
+      "license": "MIT",
+      "icon": "fan",
+      "color": "#4cc38a",
+      "category": "system",
+      "description": "Tryby wentylatorów, Turbo, temperatury CPU/GPU i limit baterii.",
+      "longDescription": "Przełącza tryby wentylatorów laptopa GIGABYTE (Auto, Cichy, Normalny, Gaming) i Turbo przez aplikację Pitaya Gear. Temperatury i obroty CPU/GPU są dostępne jako zmienne, np. {gear-fans.cpuTemp}°. Wymaga Pitaya Gear ze sterownikiem gigabyte-laptop-wmi.",
+      "features": [
+        "Tryb wentylatorów lub następny tryb",
+        "Turbo włącz / wyłącz",
+        "Limit ładowania baterii",
+        "Zmienne: temperatury, obroty, tryb"
+      ],
+      "tags": [
+        "wentylatory",
+        "temperatura",
+        "gigabyte",
+        "chłodzenie",
+        "pitaya gear"
+      ],
+      "changelog": [
+        {
+          "version": "1.0.0",
+          "notes": "Pierwsza wersja — współpracuje z Pitaya Gear."
+        }
+      ],
+      "files": [
+        {
+          "path": "index.js",
+          "size": 7117,
+          "sha256": "7571251b48e77cfa0773ec5342ebf7c2f297f95b628ce49282fef4e7d9fd714b"
+        },
+        {
+          "path": "plugin.json",
+          "size": 960,
+          "sha256": "832b555772c6fe7355800358cb2855c16ab7afb2788a495b7e16fb67a00d2410"
+        }
+      ]
+    },
+    {
+      "id": "gear-headset",
+      "name": "Słuchawki Arctis",
+      "version": "1.0.0",
+      "author": "Pitayas",
+      "license": "MIT",
+      "icon": "headphones",
+      "color": "#ff4fa6",
+      "category": "system",
+      "description": "Arctis Nova Pro Omni: ANC, mikrofon, sidetone, korektor i bateria.",
+      "longDescription": "Steruje słuchawkami SteelSeries Arctis Nova Pro Omni przez aplikację Pitaya Gear. Bateria i tryb redukcji szumów są dostępne jako zmienne, np. {gear-headset.batteryText}. Wymaga Pitaya Gear — wtyczka uruchomi go w tle, jeśli nie działa.",
+      "features": [
+        "Przełączanie ANC / Transparency",
+        "Głośność mikrofonu (także suwakiem)",
+        "Sidetone włącz / wyłącz / poziom",
+        "Presety korektora",
+        "Zmienne: bateria, zasilanie, ANC, wyciszony mikrofon"
+      ],
+      "tags": [
+        "słuchawki",
+        "steelseries",
+        "arctis",
+        "anc",
+        "mikrofon",
+        "pitaya gear"
+      ],
+      "changelog": [
+        {
+          "version": "1.0.0",
+          "notes": "Pierwsza wersja — współpracuje z Pitaya Gear."
+        }
+      ],
+      "files": [
+        {
+          "path": "index.js",
+          "size": 8176,
+          "sha256": "fe412c0e2469780c435e615ca13d30a7d4b2e191152e7b9aedcb001386d5c6a5"
+        },
+        {
+          "path": "plugin.json",
+          "size": 1028,
+          "sha256": "8760205156f47316f3fbc90305dfe7dfd70dfb6968d8bac166802bfe5f3bbe2b"
+        }
+      ]
+    },
+    {
+      "id": "gear-keyboard",
+      "name": "Klawiatura RGB",
+      "version": "1.0.0",
+      "author": "Pitayas",
+      "license": "MIT",
+      "icon": "keyboard",
+      "color": "#4ea8ff",
+      "category": "system",
+      "description": "Kolor i jasność podświetlenia klawiatury laptopa GIGABYTE.",
+      "longDescription": "Ustawia kolor i jasność podświetlenia klawiatury laptopa GIGABYTE (HID LampArray) przez aplikację Pitaya Gear. Wymaga Pitaya Gear.",
+      "features": [
+        "Dowolny kolor #rrggbb",
+        "Jaśniej / ciemniej / włącz-wyłącz (także suwakiem)",
+        "Powrót do efektu wbudowanego",
+        "Zmienne: kolor, jasność, tryb"
+      ],
+      "tags": [
+        "klawiatura",
+        "rgb",
+        "gigabyte",
+        "podświetlenie",
+        "pitaya gear"
+      ],
+      "changelog": [
+        {
+          "version": "1.0.0",
+          "notes": "Pierwsza wersja — współpracuje z Pitaya Gear."
+        }
+      ],
+      "files": [
+        {
+          "path": "index.js",
+          "size": 7222,
+          "sha256": "4914714cfad17582ab669c398e5029acb4b5b997aeedf9fe8c915eb2db6d5eac"
+        },
+        {
+          "path": "plugin.json",
+          "size": 848,
+          "sha256": "adc427e9f02855c8edad109325f008518112fe3a7b4a60694727e159060ca027"
+        }
+      ]
+    },
+    {
+      "id": "gear-mouse",
+      "name": "Mysz G502",
+      "version": "1.0.0",
+      "author": "Pitayas",
+      "license": "MIT",
+      "icon": "mouse",
+      "color": "#c77dff",
+      "category": "system",
+      "description": "Logitech G502: DPI, profile i kolor podświetlenia.",
+      "longDescription": "Steruje myszą Logitech G502 HERO przez aplikację Pitaya Gear: przełączanie poziomów DPI, profili zapisanych w myszy i podświetlenia (OpenRGB). Wymaga Pitaya Gear.",
+      "features": [
+        "Następny / poprzedni poziom DPI albo dokładna wartość",
+        "Przełączanie profili",
+        "Kolor i efekt podświetlenia",
+        "Zmienne: DPI, profil, kolor"
+      ],
+      "tags": [
+        "mysz",
+        "logitech",
+        "g502",
+        "dpi",
+        "rgb",
+        "pitaya gear"
+      ],
+      "changelog": [
+        {
+          "version": "1.0.0",
+          "notes": "Pierwsza wersja — współpracuje z Pitaya Gear."
+        }
+      ],
+      "files": [
+        {
+          "path": "index.js",
+          "size": 6952,
+          "sha256": "f41a055965c4827e5a31cfc68f9af115bdbb6b182d04ff693d5404e24cec42b4"
+        },
+        {
+          "path": "plugin.json",
+          "size": 853,
+          "sha256": "2608ff2ab653f902448e1303115079d8e6575eaf6e3e4eeedacb41dd8cce6373"
         }
       ]
     },

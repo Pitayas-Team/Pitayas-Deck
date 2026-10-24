@@ -1,0 +1,31 @@
+{
+  "id": "gear-fans",
+  "name": "Wentylatory GIGABYTE",
+  "version": "1.0.0",
+  "author": "Pitayas",
+  "license": "MIT",
+  "icon": "fan",
+  "color": "#4cc38a",
+  "category": "system",
+  "description": "Tryby wentylatorów, Turbo, temperatury CPU/GPU i limit baterii.",
+  "longDescription": "Przełącza tryby wentylatorów laptopa GIGABYTE (Auto, Cichy, Normalny, Gaming) i Turbo przez aplikację Pitaya Gear. Temperatury i obroty CPU/GPU są dostępne jako zmienne, np. {gear-fans.cpuTemp}°. Wymaga Pitaya Gear ze sterownikiem gigabyte-laptop-wmi.",
+  "features": [
+    "Tryb wentylatorów lub następny tryb",
+    "Turbo włącz / wyłącz",
+    "Limit ładowania baterii",
+    "Zmienne: temperatury, obroty, tryb"
+  ],
+  "tags": [
+    "wentylatory",
+    "temperatura",
+    "gigabyte",
+    "chłodzenie",
+    "pitaya gear"
+  ],
+  "changelog": [
+    {
+      "version": "1.0.0",
+      "notes": "Pierwsza wersja — współpracuje z Pitaya Gear."
+    }
+  ]
+}

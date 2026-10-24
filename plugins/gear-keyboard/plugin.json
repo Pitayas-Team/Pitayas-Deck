@@ -1,0 +1,31 @@
+{
+  "id": "gear-keyboard",
+  "name": "Klawiatura RGB",
+  "version": "1.0.0",
+  "author": "Pitayas",
+  "license": "MIT",
+  "icon": "keyboard",
+  "color": "#4ea8ff",
+  "category": "system",
+  "description": "Kolor i jasność podświetlenia klawiatury laptopa GIGABYTE.",
+  "longDescription": "Ustawia kolor i jasność podświetlenia klawiatury laptopa GIGABYTE (HID LampArray) przez aplikację Pitaya Gear. Wymaga Pitaya Gear.",
+  "features": [
+    "Dowolny kolor #rrggbb",
+    "Jaśniej / ciemniej / włącz-wyłącz (także suwakiem)",
+    "Powrót do efektu wbudowanego",
+    "Zmienne: kolor, jasność, tryb"
+  ],
+  "tags": [
+    "klawiatura",
+    "rgb",
+    "gigabyte",
+    "podświetlenie",
+    "pitaya gear"
+  ],
+  "changelog": [
+    {
+      "version": "1.0.0",
+      "notes": "Pierwsza wersja — współpracuje z Pitaya Gear."
+    }
+  ]
+}

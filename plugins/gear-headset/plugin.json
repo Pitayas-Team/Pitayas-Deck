@@ -1,0 +1,33 @@
+{
+  "id": "gear-headset",
+  "name": "Słuchawki Arctis",
+  "version": "1.0.0",
+  "author": "Pitayas",
+  "license": "MIT",
+  "icon": "headphones",
+  "color": "#ff4fa6",
+  "category": "system",
+  "description": "Arctis Nova Pro Omni: ANC, mikrofon, sidetone, korektor i bateria.",
+  "longDescription": "Steruje słuchawkami SteelSeries Arctis Nova Pro Omni przez aplikację Pitaya Gear. Bateria i tryb redukcji szumów są dostępne jako zmienne, np. {gear-headset.batteryText}. Wymaga Pitaya Gear — wtyczka uruchomi go w tle, jeśli nie działa.",
+  "features": [
+    "Przełączanie ANC / Transparency",
+    "Głośność mikrofonu (także suwakiem)",
+    "Sidetone włącz / wyłącz / poziom",
+    "Presety korektora",
+    "Zmienne: bateria, zasilanie, ANC, wyciszony mikrofon"
+  ],
+  "tags": [
+    "słuchawki",
+    "steelseries",
+    "arctis",
+    "anc",
+    "mikrofon",
+    "pitaya gear"
+  ],
+  "changelog": [
+    {
+      "version": "1.0.0",
+      "notes": "Pierwsza wersja — współpracuje z Pitaya Gear."
+    }
+  ]
+}

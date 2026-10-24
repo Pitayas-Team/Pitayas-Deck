@@ -135,8 +135,22 @@ function createPluginStore({ appDir, pluginsDir, dataDir, runtime, settings, log
         return { dir, version: (m && m.version) || (state().installed[id] || {}).version || '0', manifest: m };
     }
 
+    // Wtyczki wgrane ręcznie do folderu wtyczek, których nie ma w katalogu — też je pokazujemy
+    function localOnly(cat) {
+        const out = [];
+        let names = [];
+        try { names = fs.readdirSync(pluginsDir); } catch {}
+        for (const name of names) {
+            if (name.startsWith('.')) continue;
+            const m = readJson(path.join(pluginsDir, name, 'plugin.json'), null);
+            if (m && m.id && !cat.has(m.id)) out.push({ ...m, source: 'local' });
+        }
+        return out;
+    }
+
     async function list(force) {
         const cat = await catalog(force);
+        for (const p of localOnly(cat)) cat.set(p.id, p);
         const plugins = runtime.describe();
         return {
             categories: CATEGORIES,
