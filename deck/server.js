@@ -33,7 +33,7 @@ let lucide = null;
 const GLYPH_TO_LUCIDE = { 'volume-up': 'volume-2', 'volume-down': 'volume-1', 'volume-off': 'volume-x', prev: 'skip-back', next: 'skip-forward', 'play-pause': 'circle-play', play: 'play', pause: 'pause', stop: 'square', mic: 'mic', 'mic-off': 'mic-off', record: 'circle-dot', folder: 'folder', chip: 'cpu', star: 'star', home: 'house', back: 'arrow-left', gear: 'settings', lock: 'lock', power: 'power', camera: 'camera', light: 'lightbulb', terminal: 'terminal', globe: 'globe', keyboard: 'keyboard', music: 'music', bolt: 'zap' };
 
 // Polecenia innych aplikacji, które telefon może wywołać przez deck (zatwierdzone urządzenia)
-const APP_COMMANDS = { gear: ['summary', 'headset', 'mouse', 'keyboard', 'fans'] };
+const APP_COMMANDS = { gear: ['summary', 'headset', 'mouse', 'keyboard', 'fans', 'volume'] };
 
 function lucideSvg(appDir, name) {
     if (!lucide) {
