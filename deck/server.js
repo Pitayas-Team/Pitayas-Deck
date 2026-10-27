@@ -32,6 +32,9 @@ function localAddresses() {
 let lucide = null;
 const GLYPH_TO_LUCIDE = { 'volume-up': 'volume-2', 'volume-down': 'volume-1', 'volume-off': 'volume-x', prev: 'skip-back', next: 'skip-forward', 'play-pause': 'circle-play', play: 'play', pause: 'pause', stop: 'square', mic: 'mic', 'mic-off': 'mic-off', record: 'circle-dot', folder: 'folder', chip: 'cpu', star: 'star', home: 'house', back: 'arrow-left', gear: 'settings', lock: 'lock', power: 'power', camera: 'camera', light: 'lightbulb', terminal: 'terminal', globe: 'globe', keyboard: 'keyboard', music: 'music', bolt: 'zap' };
 
+// Polecenia innych aplikacji, które telefon może wywołać przez deck (zatwierdzone urządzenia)
+const APP_COMMANDS = { gear: ['summary', 'headset', 'mouse', 'keyboard', 'fans'] };
+
 function lucideSvg(appDir, name) {
     if (!lucide) {
         try { lucide = JSON.parse(fs.readFileSync(path.join(appDir, 'shared', 'lucide.json'), 'utf8')).icons; } catch { lucide = {}; }
@@ -61,17 +64,18 @@ function ruleMatches(rule, get) {
     }
 }
 
-function createServer({ store, runtime, admin = null, appDir, log, onEvent = () => {} }) {
+function createServer({ store, runtime, admin = null, appDir, log, onEvent = () => {}, appCall = null }) {
     const sessions = new Map();   // ws → { deviceId, folderId, approved }
     let server = null;
     let wss = null;
     let port = null;
 
     // ───── HTTP ─────
-    function serveFile(res, file) {
+    // cors: obrazy przycisków i okładki — aplikacja Pitayas na telefonie pobiera je przez fetch (iPhone blokuje <img src="http://…">)
+    function serveFile(res, file, cors = false) {
         fs.readFile(file, (err, data) => {
             if (err) { res.writeHead(404); res.end('Nie znaleziono'); return; }
-            res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+            res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-cache', ...(cors ? { 'Access-Control-Allow-Origin': '*' } : {}) });
             res.end(data);
         });
     }
@@ -88,7 +92,7 @@ function createServer({ store, runtime, admin = null, appDir, log, onEvent = () 
             // Tylko okładki, które właśnie pokazują odtwarzacze (ogólny i wybrane w widżetach)
             const allowed = [runtime.getVariable('media.artUrl'), ...deckApi.usedMediaPlayers().map((pl) => runtime.getVariable(`media.pl_${String(pl).replace(/[^\w]/g, '_')}_artUrl`))].map((x) => String(x || ''));
             if (!allowed.some((c) => c.startsWith('file://') && decodeURIComponent(c.slice(7)) === f) || !/\.(png|jpe?g|webp|gif)$/i.test(f)) { res.writeHead(404); res.end(); return; }
-            return serveFile(res, f);
+            return serveFile(res, f, true);
         }
         // Panel edytora w przeglądarce (deck/admin-web.js) — ma własne logowanie
         if (admin && (p === '/admin' || p.startsWith('/admin/'))) {
@@ -104,7 +108,7 @@ function createServer({ store, runtime, admin = null, appDir, log, onEvent = () 
         else if (p.startsWith('/icons/')) file = safe(path.join(appDir, 'build', 'icons'), p.slice(6));
         else file = safe(path.join(appDir, 'client'), p);
         if (!file) { res.writeHead(403); res.end(); return; }
-        serveFile(res, file);
+        serveFile(res, file, p.startsWith('/img/'));
     }
 
     // ───── Stany przycisków ─────
@@ -549,6 +553,15 @@ function createServer({ store, runtime, admin = null, appDir, log, onEvent = () 
         if (msg.t === 'nav') {
             if (msg.to === 'back') deckApi.back(s.deviceId);
             if (msg.to === 'home') deckApi.home(s.deviceId);
+            return;
+        }
+        // Inne aplikacje Pitayas przez deck (np. moduł Gear na telefonie) — tylko z listy dozwolonych
+        if (msg.t === 'app') {
+            const reply = (ok, data) => send(ws, { t: 'app-reply', id: msg.id, ok, ...(ok ? { result: data } : { error: data }) });
+            const allowed = APP_COMMANDS[msg.app];
+            if (!appCall || !allowed || !allowed.includes(msg.cmd)) return reply(false, 'Polecenie niedozwolone');
+            const args = msg.args && typeof msg.args === 'object' ? msg.args : {};
+            Promise.resolve(appCall(msg.app, msg.cmd, args)).then((r) => reply(true, r), (err) => reply(false, err.message || String(err)));
         }
     }
 

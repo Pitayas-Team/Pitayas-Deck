@@ -88,6 +88,21 @@ const server = createServer({
     admin,
     appDir: __dirname,
     log,
+    // Telefon → deck → inna aplikacja Pitayas; gdy nie działa, uruchamiamy ją w tle i próbujemy jeszcze raz
+    appCall: async (id, cmd, args) => {
+        try { return await core.send(id, cmd, args); }
+        catch {
+            const entry = core.apps().find((a) => a.id === id);
+            const l = entry && entry.launch;
+            if (!l || !l.command) throw new Error(`Pitaya ${id === 'gear' ? 'Gear' : id} nie jest zainstalowany — uruchom go raz ręcznie`);
+            require('child_process').spawn(l.command, [...(l.args || []), '--no-sandbox', '--hidden'], { cwd: l.cwd || undefined, detached: true, stdio: 'ignore' }).unref();
+            for (let i = 0; i < 20; i++) {
+                await new Promise((r) => setTimeout(r, 500));
+                try { return await core.send(id, cmd, args); } catch {}
+            }
+            throw new Error(`Nie mogę połączyć się z Pitaya ${id === 'gear' ? 'Gear' : id} na komputerze`);
+        }
+    },
     onEvent: (type, data) => {
         if (type === 'devices') { toEditor('deck:devices', data); updateTray(); }
         if (type === 'editor-nav') toEditor('deck:nav', data);
