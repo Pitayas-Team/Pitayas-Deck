@@ -1,0 +1,113 @@
+/* ═══════ MOTYW „PITAYAS” — wygląd jak strona rakunek.com: karty, serif w tytułach, pigułki, ciepłe ciemne tło ═══════
+   Włączony domyślnie (html[data-style="pitayas"]). „Neutralny motyw” = bez tego pliku, czyli dotychczasowy wygląd.
+   Wybór: Ustawienia → Wygląd. Motyw jest ciemny; paleta z logo (róż owocu, zieleń łusek). */
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
+
+html[data-style="pitayas"] {
+    --m-bg: #111111;
+    --m-chrome: #111111;
+    --m-panel: #1a1a1a;
+    --m-surface: #1f1f1f;
+    --m-item: #222222;
+    --m-item-hover: #2a2a2a;
+    --m-line: #262626;
+    --m-line-strong: #303030;
+    --m-field: #151515;
+    --m-accent: #ff4fa6;
+    --m-accent-2: #d4006f;
+    --m-accent-soft: #3a1c2d;
+    --m-accent-glow: transparent;
+    --m-grad: #ff4fa6;
+    --m-title-grad: #ff4fa6;
+    --m-leaf: #7ee04a;
+    --m-text: #f2f0ec;
+    --m-text-2: #cfcac3;
+    --m-text-3: #9a958d;
+    --serif: 'Instrument Serif', Georgia, serif;
+}
+html[data-style="pitayas"] ::selection { background: rgba(255, 79, 166, .35); }
+
+/* Tytuły: serif */
+html[data-style="pitayas"] .page h1,
+html[data-style="pitayas"] .page h2,
+html[data-style="pitayas"] .m-titlebar-name,
+html[data-style="pitayas"] .m-hero-title,
+html[data-style="pitayas"] .m-modal-title { font-family: var(--serif); font-weight: 400; letter-spacing: -.01em; }
+html[data-style="pitayas"] .page h1 { font-size: 38px; line-height: 1; }
+html[data-style="pitayas"] .page h2 { font-size: 28px; line-height: 1.05; }
+html[data-style="pitayas"] .m-titlebar-name { font-size: 20px; }
+html[data-style="pitayas"] .store-hero h1 { font-size: 40px; }
+
+/* Etykiety wielkimi literami, bez kropek */
+html[data-style="pitayas"] .fold-head,
+html[data-style="pitayas"] .lk-title,
+html[data-style="pitayas"] .split-sub { font-weight: 500; letter-spacing: .12em; }
+
+/* Pasek okna i lewy pasek */
+html[data-style="pitayas"] .m-titlebar { border-bottom: 1px solid var(--m-line); }
+html[data-style="pitayas"] .rail { padding: 12px 10px; }
+html[data-style="pitayas"] .rail a { border-radius: 999px; padding: 0 14px; }
+html[data-style="pitayas"] .rail a b { font-weight: 500; }
+html[data-style="pitayas"] .rail a.active { color: var(--m-accent); }
+html[data-style="pitayas"] .rail a.active::before { display: none; }
+html[data-style="pitayas"] .rail-badge { background: var(--m-accent); }
+html[data-style="pitayas"] .tb-btn { border-radius: 50%; }
+html[data-style="pitayas"] .pp-btn { border-radius: 999px; height: 34px; background: var(--m-panel); }
+html[data-style="pitayas"] .pp-badge { border-radius: 50%; width: 24px; height: 24px; }
+html[data-style="pitayas"] .pp-menu { border-radius: 22px; }
+html[data-style="pitayas"] .pp-menu button { border-radius: 999px; }
+html[data-style="pitayas"] .conn-pill { background: var(--m-accent-soft); border-color: transparent; color: var(--m-accent); }
+html[data-style="pitayas"] .m-status-dot.active { box-shadow: none; }
+html[data-style="pitayas"] .m-update-pill { border-color: transparent; }
+
+/* Karty i panele */
+html[data-style="pitayas"] .card,
+html[data-style="pitayas"] .set-sec,
+html[data-style="pitayas"] .m-panel,
+html[data-style="pitayas"] .int-row,
+html[data-style="pitayas"] .m-update-card { border-radius: 28px; }
+html[data-style="pitayas"] .card h3 { font-weight: 600; }
+html[data-style="pitayas"] .store-hero,
+html[data-style="pitayas"] .m-hero { background: var(--m-panel); box-shadow: none; border-color: var(--m-line); border-radius: 28px; }
+html[data-style="pitayas"] .we-preview { background: var(--m-chrome); }
+html[data-style="pitayas"] .m-modal { border-radius: 28px; box-shadow: none; }
+html[data-style="pitayas"] .m-modal-overlay { backdrop-filter: none; background: rgba(0, 0, 0, .65); }
+html[data-style="pitayas"] .popover { border-radius: 22px; box-shadow: none; }
+html[data-style="pitayas"] .m-toast { border-radius: 999px; box-shadow: none; }
+
+/* Przyciski: płaskie, bez poświat */
+html[data-style="pitayas"] .m-btn { font-weight: 500; }
+html[data-style="pitayas"] .m-btn:hover:not(:disabled) { transform: none; }
+html[data-style="pitayas"] .m-btn.accent { background: var(--m-accent); color: #fff; box-shadow: none; font-weight: 600; }
+html[data-style="pitayas"] .m-btn.accent:hover:not(:disabled) { background: var(--m-accent); filter: brightness(1.08); }
+html[data-style="pitayas"] .m-btn.danger { background: #3a1d24; color: #ff8a98; box-shadow: none; }
+html[data-style="pitayas"] .m-btn.danger:hover:not(:disabled) { background: #46222b; filter: none; }
+html[data-style="pitayas"] .m-btn.success { color: #0c1a07; }
+html[data-style="pitayas"] .m-tab.active { background: var(--m-accent); color: #fff; box-shadow: none; }
+
+/* Segmenty, żetony, pola */
+html[data-style="pitayas"] .seg { border-radius: 999px; background: var(--m-panel); border-color: var(--m-line); }
+html[data-style="pitayas"] .seg button { border-radius: 999px; font-weight: 500; }
+html[data-style="pitayas"] .seg button.active { background: var(--m-accent-soft); color: var(--m-accent); }
+html[data-style="pitayas"] .m-input,
+html[data-style="pitayas"] .m-select { border-radius: 999px; padding-left: 16px; }
+html[data-style="pitayas"] textarea.m-input { border-radius: 22px; }
+html[data-style="pitayas"] .m-input:focus,
+html[data-style="pitayas"] .m-select:focus { border-color: var(--m-accent); box-shadow: none; }
+html[data-style="pitayas"] .switch:checked { background: var(--m-leaf); }
+html[data-style="pitayas"] .chip,
+html[data-style="pitayas"] .state-chips button { background: var(--m-panel); }
+html[data-style="pitayas"] .state-chips button { border-radius: 999px; }
+html[data-style="pitayas"] .state-chips button.active { color: var(--m-accent); }
+html[data-style="pitayas"] .pill.feat { color: var(--m-accent); }
+html[data-style="pitayas"] .store-chips button { border-radius: 999px; }
+
+/* Foldery i listy */
+html[data-style="pitayas"] .tree-item { border-radius: 999px; height: 36px; padding-left: 8px; }
+html[data-style="pitayas"] .tree-item.active,
+html[data-style="pitayas"] .split-item.active { color: var(--m-accent); }
+html[data-style="pitayas"] .split-item { border-radius: 999px; }
+html[data-style="pitayas"] .stage { border-radius: 28px; }
+
+/* Przewijanie */
+html[data-style="pitayas"] ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .1); background-clip: padding-box; border: 2px solid transparent; }

@@ -374,6 +374,7 @@
             $('fApproval2').checked = PD.data.deck.settings.requireApproval;
             $('fClock').checked = PD.data.deck.settings.showClock;
             $('fAutostart').value = PD.data.deck.settings.autostart || 'off';
+            markStyle();
             $('importCard').hidden = deck.isWebAdmin || !(await deck.macroDeckAvailable());
             renderAdmin(await deck.adminConfig());
             deck.keyboardStatus().then((s) => {
@@ -421,6 +422,20 @@
     $('adminUrls').onclick = (e) => {
         const b = e.target.closest('[data-copy]');
         if (b) { deck.copyText(b.dataset.copy); PD.toast('Skopiowano adres', 'success'); }
+    };
+
+    // Motyw okna: „pitayas” (nowy, domyślny) albo „neutral” (dotychczasowy); zapamiętany w tej przeglądarce/oknie
+    const markStyle = () => {
+        const cur = document.documentElement.dataset.style === 'neutral' ? 'neutral' : 'pitayas';
+        $('fStyle').querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.v === cur));
+    };
+    $('fStyle').onclick = (e) => {
+        const b = e.target.closest('button[data-v]');
+        if (!b) return;
+        document.documentElement.dataset.style = b.dataset.v;
+        try { localStorage.setItem('pd-style', b.dataset.v); } catch {}
+        markStyle();
+        PD.toast(b.dataset.v === 'neutral' ? 'Przywrócono neutralny motyw' : 'Włączono motyw Pitayas', 'success');
     };
 
     $('fPort').onchange = async () => { const res = await deck.settings({ port: parseInt($('fPort').value, 10) }); PD.data.server = res.server; PD.renderConnection(); PD.toast(`Serwer działa na porcie ${res.server.port}`, 'success'); };

@@ -3,9 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <title>Pitaya Deck</title>
+  <!-- Motyw wyglądu: „pitayas” (domyślny) albo „neutral” (dotychczasowy wygląd); ustawiany w Ustawienia → Wygląd -->
+  <script>try { document.documentElement.dataset.style = localStorage.getItem('pd-style') === 'neutral' ? 'neutral' : 'pitayas'; } catch (e) { document.documentElement.dataset.style = 'pitayas'; }</script>
   <link rel="stylesheet" href="../core/ui/pitaya-theme.css">
   <link rel="stylesheet" href="../shared/render.css">
   <link rel="stylesheet" href="editor.css">
+  <link rel="stylesheet" href="theme-pitayas.css">
 </head>
 <body>
   <!-- PASEK OKNA: marka · profil · połączenie -->
@@ -211,6 +214,12 @@
             <div><b>Przenieś deck z Macro Deck</b><div class="m-small">Foldery, przyciski ze stanami, suwaki, zegar, wskaźniki, odtwarzacz i ikony trafią do nowego profilu. Macro Deck zostaje bez zmian.</div><div class="m-small" id="importResult"></div></div>
             <button class="m-btn small accent" id="btnImportMd">Importuj</button>
           </div>
+
+          <section class="set-sec">
+            <header><span class="set-ico" data-i="palette"></span><div><h3>Wygląd</h3><p>Motyw okna Decka na komputerze</p></div></header>
+            <div class="set-row"><div><b>Motyw</b><small>„Pitayas” to styl jak na stronie. „Neutralny motyw” przywraca dotychczasowy wygląd</small></div>
+              <div class="seg small" id="fStyle"><button data-v="pitayas">Pitayas</button><button data-v="neutral">Neutralny motyw</button></div></div>
+          </section>
 
           <section class="set-sec">
             <header><span class="set-ico" data-i="wifi"></span><div><h3>Połączenie</h3><p>Jak telefony i tablety łączą się z deckiem</p></div></header>
