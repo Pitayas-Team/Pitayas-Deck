@@ -85,7 +85,7 @@
             R.paint(tile, rendered, unit);
             tile.style.width = `${Math.round(unit * w)}px`;
             tile.style.height = `${Math.round(unit * h)}px`;
-            tile.style.setProperty('--pd-radius', `${Math.round(unit * 0.22)}px`);
+            tile.style.setProperty('--pd-radius', `${Math.round(unit * (document.documentElement.dataset.style === 'pitayas' ? 0.34 : 0.22))}px`);
             R.tickClocks(box);
         }, 60);
     }

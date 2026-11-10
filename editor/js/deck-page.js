@@ -40,7 +40,9 @@
         const grid = $('grid');
         grid.style.setProperty('--cell', `${cell}px`);
         grid.style.setProperty('--gap', `${Math.round(cell * sp)}px`);
-        grid.style.setProperty('--pd-radius', `${Math.round((cell * (state.style.radius ?? 22)) / 100)}px`);
+        // Motyw „Pitayas”: mocno zaokrąglone przyciski (min. 34% boku), „Neutralny”: jak w profilu
+        const radiusPct = Math.max(state.style.radius ?? 22, document.documentElement.dataset.style === 'pitayas' ? 34 : 0);
+        grid.style.setProperty('--pd-radius', `${Math.round((cell * radiusPct) / 100)}px`);
         grid.style.gridTemplateColumns = `repeat(${cols}, ${cell}px)`;
         grid.style.gridTemplateRows = `repeat(${rows}, ${cell}px)`;
         grid.classList.toggle('empty-hidden', state.style.emptyCells === 'transparent');

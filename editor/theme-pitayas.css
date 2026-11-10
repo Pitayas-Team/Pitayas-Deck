@@ -37,6 +37,9 @@ html[data-style="pitayas"] .page h1 { font-size: 38px; line-height: 1; }
 html[data-style="pitayas"] .page h2 { font-size: 28px; line-height: 1.05; }
 html[data-style="pitayas"] .m-titlebar-name { font-size: 20px; }
 html[data-style="pitayas"] .store-hero h1 { font-size: 40px; }
+html[data-style="pitayas"] .m-modal-title { font-size: 26px; line-height: 1.1; }
+html[data-style="pitayas"] .m-modal-header { padding: 18px 24px; }
+html[data-style="pitayas"] .we-title b { font-family: var(--serif); font-weight: 400; font-size: 22px; }
 
 /* Etykiety wielkimi literami, bez kropek */
 html[data-style="pitayas"] .fold-head,
@@ -48,6 +51,7 @@ html[data-style="pitayas"] .m-titlebar { border-bottom: 1px solid var(--m-line);
 html[data-style="pitayas"] .rail { padding: 12px 10px; }
 html[data-style="pitayas"] .rail a { border-radius: 999px; padding: 0 14px; }
 html[data-style="pitayas"] .rail a b { font-weight: 500; }
+html[data-style="pitayas"] body.rail-collapsed .rail a { padding: 0; justify-content: center; }
 html[data-style="pitayas"] .rail a.active { color: var(--m-accent); }
 html[data-style="pitayas"] .rail a.active::before { display: none; }
 html[data-style="pitayas"] .rail-badge { background: var(--m-accent); }
@@ -111,3 +115,18 @@ html[data-style="pitayas"] .stage { border-radius: 28px; }
 
 /* Przewijanie */
 html[data-style="pitayas"] ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .1); background-clip: padding-box; border: 2px solid transparent; }
+
+/* Mocne zaokrąglenia jak na koncepcji: okna, menu, pola, kafelki, podglądy */
+html[data-style="pitayas"] .stage,
+html[data-style="pitayas"] .we-look,
+html[data-style="pitayas"] .store-hero { border-radius: 36px; }
+html[data-style="pitayas"] .m-modal,
+html[data-style="pitayas"] .popover,
+html[data-style="pitayas"] .pp-menu { border-radius: 32px; }
+html[data-style="pitayas"] .icon-mini,
+html[data-style="pitayas"] .int-ico { border-radius: 50%; }
+html[data-style="pitayas"] .int-ico.big { border-radius: 24px; }
+html[data-style="pitayas"] .fold-foot .m-btn,
+html[data-style="pitayas"] .tool { border-radius: 999px; }
+html[data-style="pitayas"] .cell-edit { border-radius: var(--pd-radius); }
+html[data-style="pitayas"] .m-modal-footer { background: var(--m-panel); }

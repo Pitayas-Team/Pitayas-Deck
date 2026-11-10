@@ -435,6 +435,7 @@
         document.documentElement.dataset.style = b.dataset.v;
         try { localStorage.setItem('pd-style', b.dataset.v); } catch {}
         markStyle();
+        window.dispatchEvent(new Event('resize'));   // siatka przelicza zaokrąglenie przycisków
         PD.toast(b.dataset.v === 'neutral' ? 'Przywrócono neutralny motyw' : 'Włączono motyw Pitayas', 'success');
     };
 
